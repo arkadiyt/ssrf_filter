@@ -11,9 +11,9 @@
 
 ssrf_filter makes it easy to defend against server side request forgery (SSRF) attacks. SSRF vulnerabilities happen when you accept URLs as user input and fetch them on your server (for instance, when a user enters a link into a Twitter/Facebook status update and a content preview is generated).
 
-Users can pass in URLs or IPs such that your server will make requests to the internal network. For example, if you're hosted on AWS they can request the [instance metadata endpoint](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html) `http://169.254.169.254/latest/meta-data/`, and get your IAM credentials.
+Users can pass in URLs or IPs such that your server will make requests to the internal network. For example if you're hosted on AWS they can request the [instance metadata endpoint](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html) `http://169.254.169.254/latest/meta-data/` and get your IAM credentials.
 
-Attempts to guard against this are often implemented incorrectly, by blocking all ip addresses, not handling IPv6 or http redirects correctly, or have TOCTTOU bugs and other issues.
+Attempts to guard against this are often implemented incorrectly, by blocking all ip addresses, not handling IPv6 or http redirects correctly, or having TOCTTOU bugs and other issues.
 
 This gem provides a safe and easy way to fetch content from user-submitted urls. It:
 - handles URIs/IPv4/IPv6, redirects, DNS, etc, correctly
@@ -26,7 +26,7 @@ This gem provides a safe and easy way to fetch content from user-submitted urls.
 1) Add the gem to your Gemfile:
 
 ```ruby
-gem 'ssrf_filter'
+gem 'ssrf_filter', '~> 1.0'
 ```
 
 2) In your code:
@@ -49,7 +49,7 @@ Fetches the requested url using a get/put/post/delete request, respectively.
 Params:
 - `url` — the url to fetch.
 - `options` — options hash (described below).
-- `block` — a block that will receive the [http request](https://ruby-doc.org/stdlib-2.4.1/libdoc/net/http/rdoc/Net/HTTPGenericRequest.html) object before it's sent, if you need to do any pre-processing on it (see examples below).
+- `block` — a block that will receive the [HTTPRequest](https://ruby-doc.org/stdlib-2.4.1/libdoc/net/http/rdoc/Net/HTTPGenericRequest.html) object before it's sent, if you need to do any pre-processing on it (see examples below).
 
 Options hash:
 - `:scheme_whitelist` — an array of schemes to allow. Defaults to `%w[http https]`.
@@ -58,6 +58,10 @@ Options hash:
 - `:params` — Hash of params to send with the request.
 - `:headers` — Hash of headers to send with the request.
 - `:body` — Body to send with the request.
+
+Returns:
+
+An [HTTPResponse](https://ruby-doc.org/stdlib-2.4.1/libdoc/net/http/rdoc/Net/HTTPResponse.html) object if the url was fetched safely, or throws an exception if it was unsafe. All exceptions inherit from `SsrfFilter::Error`.
 
 Examples:
 
@@ -70,17 +74,21 @@ SsrfFilter.get('https://www.example.com?param=value')
 SsrfFilter.get('https://www.example.com', params: {'param' => 'value'})
 
 # POST, send custom header, and don't follow redirects
-SsrfFilter.post('https://www.example.com', max_redirects: 0,
-  headers: {'content-type': 'application/json'})
+begin
+  SsrfFilter.post('https://www.example.com', max_redirects: 0,
+    headers: {'content-type' => 'application/json'})
+rescue SsrfFilter::Error => e
+  # Got an unsafe url
+end
 
 # Custom DNS resolution and request processing
 resolver = proc do |hostname|
   [IPAddr.new('2001:500:8f::53')] # Static resolver
 end
-SsrfFilter.get('https://www.example.com', resolver: resolver) do |http|
+SsrfFilter.get('https://www.example.com', resolver: resolver) do |request|
   # Do some extra processing on the request
-  http['content-type'] = 'application/json'
-  http.basic_auth('username', 'password')
+  request['content-type'] = 'application/json'
+  request.basic_auth('username', 'password')
 end
 ```
 
