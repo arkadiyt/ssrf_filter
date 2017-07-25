@@ -1,0 +1,93 @@
+# ssrf_filter [![Gem](https://img.shields.io/gem/v/ssrf_filter.svg)](https://rubygems.org/gems/ssrf_filter) [![TravisCI](https://travis-ci.org/arkadiyt/ssrf_filter.svg?branch=master)](https://travis-ci.org/arkadiyt/ssrf_filter/) [![Coverage Status](https://coveralls.io/repos/github/arkadiyt/ssrf_filter/badge.svg?branch=master)](https://coveralls.io/github/arkadiyt/ssrf_filter?branch=master) [![Dependency Status](https://gemnasium.com/badges/github.com/arkadiyt/ssrf_filter.svg)](https://gemnasium.com/github.com/arkadiyt/ssrf_filter) [![License](https://img.shields.io/github/license/arkadiyt/ssrf_filter.svg)](https://github.com/arkadiyt/ssrf_filter/blob/master/LICENSE.md)
+
+## Table of Contents
+- [What's it for](https://github.com/arkadiyt/ssrf_filter#whats-it-for)
+- [Quick start](https://github.com/arkadiyt/ssrf_filter#quick-start)
+- [API Reference](https://github.com/arkadiyt/ssrf_filter#api-reference)
+- [Changelog](https://github.com/arkadiyt/ssrf_filter#changelog)
+- [Contributing](https://github.com/arkadiyt/ssrf_filter#contributing)
+
+### What's it for
+
+ssrf_filter makes it easy to defend against server side request forgery (SSRF) attacks. SSRF vulnerabilities happen when you accept URLs as user input and fetch them on your server (for instance, when a user enters a link into a Twitter/Facebook status update and a content preview is generated).
+
+Users can pass in URLs or IPs such that your server will make requests to the internal network. For example, if you're hosted on AWS they can request the [instance metadata endpoint](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html) `http://169.254.169.254/latest/meta-data/`, and get your IAM credentials.
+
+Attempts to guard against this are often implemented incorrectly, by blocking all ip addresses, not handling IPv6 or http redirects correctly, or have TOCTTOU bugs and other issues.
+
+This gem provides a safe and easy way to fetch content from user-submitted urls. It:
+- handles URIs/IPv4/IPv6, redirects, DNS, etc, correctly
+- has 0 runtime dependencies
+- has a comprehensive test suite (100% code coverage)
+- is tested against ruby `2.0`, `2.1`, `2.2`, `2.3`, `2.4`, and `ruby-head`
+
+### Quick start
+
+1) Add the gem to your Gemfile:
+
+```ruby
+gem 'ssrf_filter'
+```
+
+2) In your code:
+
+```ruby
+require 'ssrf_filter'
+response = SsrfFilter.get(params[:url]) # throws an exception for unsafe fetches
+response.code
+=> "200"
+response.body
+=> "<!doctype html>\n<html>\n<head>\n..."
+```
+
+### API reference
+
+`SsrfFilter.get/.put/.post/.delete(url, options = {}, &block)`
+
+Fetches the requested url using a get/put/post/delete request, respectively.
+
+Params:
+- `url` — the url to fetch.
+- `options` — options hash (described below).
+- `block` — a block that will receive the [http request](https://ruby-doc.org/stdlib-2.4.1/libdoc/net/http/rdoc/Net/HTTPGenericRequest.html) object before it's sent, if you need to do any pre-processing on it (see examples below).
+
+Options hash:
+- `:scheme_whitelist` — an array of schemes to allow. Defaults to `%w[http https]`.
+- `:resolver` — a proc that receives a hostname string and returns an array of [IPAddr](https://ruby-doc.org/stdlib-2.4.1/libdoc/ipaddr/rdoc/IPAddr.html) objects. Defaults to resolving with Ruby's [Resolv](https://ruby-doc.org/stdlib-2.4.1/libdoc/resolv/rdoc/Resolv.html). See examples below for a custom resolver.
+- `:max_redirects` — Maximum number of redirects to follow. Defaults to 10.
+- `:params` — Hash of params to send with the request.
+- `:headers` — Hash of headers to send with the request.
+- `:body` — Body to send with the request.
+
+Examples:
+
+```ruby
+# GET www.example.com
+SsrfFilter.get('https://www.example.com')
+
+# Pass params - these are equivalent
+SsrfFilter.get('https://www.example.com?param=value')
+SsrfFilter.get('https://www.example.com', params: {'param' => 'value'})
+
+# POST, send custom header, and don't follow redirects
+SsrfFilter.post('https://www.example.com', max_redirects: 0,
+  headers: {'content-type': 'application/json'})
+
+# Custom DNS resolution and request processing
+resolver = proc do |hostname|
+  [IPAddr.new('2001:500:8f::53')] # Static resolver
+end
+SsrfFilter.get('https://www.example.com', resolver: resolver) do |http|
+  # Do some extra processing on the request
+  http['content-type'] = 'application/json'
+  http.basic_auth('username', 'password')
+end
+```
+
+### Changelog
+
+Please see [CHANGELOG.md](https://github.com/arkadiyt/ssrf_filter/blob/master/CHANGELOG.md). This project follows [semantic versioning](http://semver.org/).
+
+### Contributing
+
+Please see [CONTRIBUTING.md](https://github.com/arkadiyt/ssrf_filter/blob/master/CONTRIBUTING.md).
