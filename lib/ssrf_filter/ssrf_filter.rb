@@ -156,7 +156,8 @@ class SsrfFilter
     uri.hostname = ip
 
     request = VERB_MAP[verb].new(uri)
-    request['host'] = hostname
+    # Attach port for non-80 as per RFC2616
+    request['host'] = uri.port == 80 ? hostname : "#{hostname}:#{uri.port}"
 
     Array(options[:headers]).each do |header, value|
       request[header] = value
