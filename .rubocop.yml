@@ -25,5 +25,11 @@ Layout/SpaceInsideHashLiteralBraces:
 Layout/MultilineMethodCallBraceLayout:
   Enabled: false
 
+Layout/MultilineMethodCallIndentation:
+  Enabled: false
+
 Style/Documentation:
+  Enabled: false
+
+Style/NumericLiterals:
   Enabled: false

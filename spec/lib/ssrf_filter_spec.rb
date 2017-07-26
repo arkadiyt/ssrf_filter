@@ -78,7 +78,7 @@ describe SsrfFilter do
 
   context 'fetch_once' do
     it 'should set the host header' do
-      stub_request(:post, "https://#{public_ipv4}").with(headers: {host: 'www.example.com'}).to_return(
+      stub_request(:post, "https://#{public_ipv4}").with(headers: {host: 'www.example.com:443'}).to_return(
         status: 200, body: 'response body')
       response = SsrfFilter.fetch_once(URI('https://www.example.com'), public_ipv4.to_s, :post, {})
       expect(response.code).to eq('200')
@@ -87,7 +87,7 @@ describe SsrfFilter do
 
     it 'should pass headers, params, and blocks' do
       stub_request(:get, "https://#{public_ipv4}/?key=value").with(headers:
-        {host: 'www.example.com', header: 'value', header2: 'value2'}).to_return(status: 200, body: 'response body')
+        {host: 'www.example.com:443', header: 'value', header2: 'value2'}).to_return(status: 200, body: 'response body')
       options = {
         headers: {'header' => 'value'},
         params: {'key' => 'value'}
@@ -102,7 +102,7 @@ describe SsrfFilter do
 
     it 'should merge params' do
       stub_request(:get, "https://#{public_ipv4}/?key=value&key2=value2").with(
-        headers: {host: 'www.example.com'}).to_return(status: 200, body: 'response body')
+        headers: {host: 'www.example.com:443'}).to_return(status: 200, body: 'response body')
       uri = URI('https://www.example.com/?key=value')
       response = SsrfFilter.fetch_once(uri, public_ipv4.to_s, :get, params: {'key2' => 'value2'})
       expect(response.code).to eq('200')
@@ -154,7 +154,7 @@ describe SsrfFilter do
       SsrfFilter.patch_ssl_socket!
     end
 
-    context 'integration test' do
+    context 'integration tests' do
       # To test the SSLSocket patching logic (and hit 100% code coverage), we need to make a real connection to a
       # TLS-enabled server. To do this we create a private key and certificate, spin up a web server in
       # a thread (serving traffic on localhost), and make a request to the server. This requires several things:
@@ -183,22 +183,34 @@ describe SsrfFilter do
         [private_key, certificate]
       end
 
-      def make_web_server(port, private_key, certificate, &block)
-        Thread.new do
-          server = WEBrick::HTTPServer.new(
-            Port: port,
-            SSLEnable: true,
-            SSLCertificate: certificate,
-            SSLPrivateKey: private_key,
-            StartCallback: block
-          )
+      def make_web_server(port, private_key, certificate, opts = {}, &block)
+        server = WEBrick::HTTPServer.new({
+          Port: port,
+          SSLEnable: true,
+          SSLCertificate: certificate,
+          SSLPrivateKey: private_key,
+          StartCallback: block
+        }.merge(opts))
 
-          server.mount_proc '/' do |_, res|
-            res.status = 200
-            res.body = 'webrick response'
-          end
+        server.mount_proc '/' do |_, res|
+          res.status = 200
+          res.body = "webrick #{certificate.subject}"
+        end
 
-          server.start
+        server
+      end
+
+      def inject_custom_trust_store(*certificates)
+        store = OpenSSL::X509::Store.new
+        certificates.each do |certificate|
+          store.add_cert(certificate)
+        end
+
+        expect(::Net::HTTP).to receive(:start).exactly(certificates.length).times
+          .and_wrap_original do |orig, *args, &block|
+
+          args.last[:cert_store] = store # Inject our custom trust store
+          orig.call(*args, &block)
         end
       end
 
@@ -208,12 +220,7 @@ describe SsrfFilter do
         private_key, certificate = make_keypair("CN=#{hostname}")
         stub_const('SsrfFilter::IPV4_BLACKLIST', [])
 
-        store = OpenSSL::X509::Store.new
-        store.add_cert(certificate)
-        expect(::Net::HTTP).to receive(:start).and_wrap_original do |orig, *args, &block|
-          args.last[:cert_store] = store # Inject our custom trust store
-          orig.call(*args, &block)
-        end
+        inject_custom_trust_store(certificate)
 
         begin
           called = false
@@ -221,12 +228,72 @@ describe SsrfFilter do
             Thread.stop
             response = SsrfFilter.get("https://#{hostname}:#{port}", resolver: proc { [IPAddr.new('127.0.0.1')] })
             expect(response.code).to eq('200')
-            expect(response.body).to eq('webrick response')
+            expect(response.body).to eq('webrick /CN=ssrf-filter.example.com')
             called = true
           end
 
-          web_server_thread = make_web_server(port, private_key, certificate) do
+          server = make_web_server(port, private_key, certificate) do
             rspec_thread.wakeup
+          end
+
+          web_server_thread = Thread.new do
+            server.start
+          end
+
+          Timeout.timeout(5) do
+            rspec_thread.join
+            expect(called).to be(true)
+          end
+        ensure
+          rspec_thread.kill unless rspec_thread.nil?
+          web_server_thread.kill unless web_server_thread.nil?
+        end
+      end
+
+      it 'should successfully connect when using SNI' do
+        # SNI was broken in WEBRick until the following commits on ruby-head:
+        # https://github.com/ruby/ruby/commit/08bdbef5cabeb1a8b84b9ddf7a3137289620d46b
+        # https://github.com/ruby/ruby/commit/a6c13d08d7d2035a22855c8f412694d13ba2faa0
+        #
+        # We need that for this test, so only execute if we're on a revision that has those commits
+        return pending if RUBY_REVISION < 59351
+
+        port = 8443
+        private_key, certificate = make_keypair('CN=localhost')
+        virtualhost_private_key, virtualhost_certificate = make_keypair('CN=virtualhost')
+        stub_const('SsrfFilter::IPV4_BLACKLIST', [])
+
+        inject_custom_trust_store(certificate, virtualhost_certificate)
+
+        begin
+          called = false
+          rspec_thread = Thread.new do
+            Thread.stop
+            options = {
+              resolver: proc { [IPAddr.new('127.0.0.1')] }
+            }
+
+            response = SsrfFilter.get("https://localhost:#{port}", options)
+            expect(response.code).to eq('200')
+            expect(response.body).to eq('webrick /CN=localhost')
+
+            response = SsrfFilter.get("https://virtualhost:#{port}", options)
+            expect(response.code).to eq('200')
+            expect(response.body).to eq('webrick /CN=virtualhost')
+
+            called = true
+          end
+
+          server = make_web_server(port, private_key, certificate, ServerName: 'localhost') do
+            rspec_thread.wakeup
+          end
+
+          options = {ServerName: 'virtualhost', DoNotListen: true}
+          virtualhost = make_web_server(port, virtualhost_private_key, virtualhost_certificate, options)
+          server.virtual_host(virtualhost)
+
+          web_server_thread = Thread.new do
+            server.start
           end
 
           Timeout.timeout(5) do
@@ -283,7 +350,7 @@ describe SsrfFilter do
     end
 
     it 'should fail if there are too many redirects' do
-      stub_request(:get, "https://#{public_ipv4}").with(headers: {host: 'www.example.com'}).to_return(
+      stub_request(:get, "https://#{public_ipv4}").with(headers: {host: 'www.example.com:443'}).to_return(
         status: 301, headers: {location: private_ipv4})
       resolver = proc { [public_ipv4] }
       expect do
@@ -292,7 +359,7 @@ describe SsrfFilter do
     end
 
     it 'should fail if the redirected url is not in the scheme whitelist' do
-      stub_request(:put, "https://#{public_ipv4}").with(headers: {host: 'www.example.com'}).to_return(
+      stub_request(:put, "https://#{public_ipv4}").with(headers: {host: 'www.example.com:443'}).to_return(
         status: 301, headers: {location: 'ftp://www.example.com'})
       resolver = proc { [public_ipv4] }
       expect do
@@ -301,7 +368,7 @@ describe SsrfFilter do
     end
 
     it 'should fail if the redirected url has no public ip address' do
-      stub_request(:delete, "https://#{public_ipv4}").with(headers: {host: 'www.example.com'}).to_return(
+      stub_request(:delete, "https://#{public_ipv4}").with(headers: {host: 'www.example.com:443'}).to_return(
         status: 301, headers: {location: 'https://www.example2.com'})
       resolver = proc do |hostname|
         [{
@@ -315,10 +382,10 @@ describe SsrfFilter do
     end
 
     it 'should follow redirects and succeed on a public hostname' do
-      stub_request(:post, "https://#{public_ipv4}/path?key=value").with(headers: {host: 'www.example.com'}).to_return(
-        status: 301, headers: {location: 'https://www.example2.com/path2?key2=value2'})
+      stub_request(:post, "https://#{public_ipv4}/path?key=value").with(headers: {host: 'www.example.com:443'})
+        .to_return(status: 301, headers: {location: 'https://www.example2.com/path2?key2=value2'})
       stub_request(:post, "https://#{public_ipv6}/path2?key2=value2").with(
-        headers: {host: 'www.example2.com'}).to_return(status: 200, body: 'response body')
+        headers: {host: 'www.example2.com:443'}).to_return(status: 200, body: 'response body')
       resolver = proc do |hostname|
         [{
           'www.example.com' => public_ipv4,
