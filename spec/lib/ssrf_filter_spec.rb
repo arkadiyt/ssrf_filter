@@ -31,8 +31,13 @@ describe SsrfFilter do
 
     it 'should return true for mapped/compat ipv4 addresses' do
       SsrfFilter::IPV4_BLACKLIST.each do |addr|
-        expect(SsrfFilter.unsafe_ip_address?(addr.to_range.first.ipv4_compat)).to be(true)
-        expect(SsrfFilter.unsafe_ip_address?(addr.to_range.first.ipv4_mapped)).to be(true)
+        %i[ipv4_compat ipv4_mapped].each do |method|
+          first = addr.to_range.first.send(method).mask(128)
+          expect(SsrfFilter.unsafe_ip_address?(first)).to be(true)
+
+          last = addr.to_range.last.send(method).mask(128)
+          expect(SsrfFilter.unsafe_ip_address?(last)).to be(true)
+        end
       end
     end
 
@@ -44,6 +49,18 @@ describe SsrfFilter do
       allow(public_ipv4).to receive(:ipv4?).and_return(false)
       allow(public_ipv4).to receive(:ipv6?).and_return(false)
       expect(SsrfFilter.unsafe_ip_address?(public_ipv4)).to be(true)
+    end
+  end
+
+  context 'prefixlen_from_ipaddr' do
+    it 'should return the prefix length' do
+      expect(SsrfFilter.prefixlen_from_ipaddr(IPAddr.new('0.0.0.0/8'))).to eq(8)
+      expect(SsrfFilter.prefixlen_from_ipaddr(IPAddr.new('198.18.0.0/15'))).to eq(15)
+      expect(SsrfFilter.prefixlen_from_ipaddr(IPAddr.new('255.255.255.255'))).to eq(32)
+
+      expect(SsrfFilter.prefixlen_from_ipaddr(IPAddr.new('::1'))).to eq(128)
+      expect(SsrfFilter.prefixlen_from_ipaddr(IPAddr.new('64:ff9b::/96'))).to eq(96)
+      expect(SsrfFilter.prefixlen_from_ipaddr(IPAddr.new('fc00::/7'))).to eq(7)
     end
   end
 

@@ -4,6 +4,22 @@ require 'resolv'
 require 'uri'
 
 class SsrfFilter
+  def self.prefixlen_from_ipaddr(ipaddr)
+    mask_addr = ipaddr.instance_variable_get('@mask_addr')
+    raise ArgumentError, 'Invalid mask' if mask_addr.zero?
+
+    mask_addr >>= 1 while (mask_addr & 0x1).zero?
+
+    length = 0
+    while mask_addr & 0x1 == 0x1
+      length += 1
+      mask_addr >>= 1
+    end
+
+    length
+  end
+  private_class_method :prefixlen_from_ipaddr
+
   # https://en.wikipedia.org/wiki/Reserved_IP_addresses
   IPV4_BLACKLIST = [
     ::IPAddr.new('0.0.0.0/8'), # Current network (only valid as source address)
@@ -24,7 +40,7 @@ class SsrfFilter
     ::IPAddr.new('255.255.255.255') # Broadcast
   ].freeze
 
-  IPV6_BLACKLIST = [
+  IPV6_BLACKLIST = ([
     ::IPAddr.new('::1/128'), # Loopback
     ::IPAddr.new('64:ff9b::/96'), # IPv4/IPv6 translation (RFC 6052)
     ::IPAddr.new('100::/64'), # Discard prefix (RFC 6666)
@@ -36,7 +52,14 @@ class SsrfFilter
     ::IPAddr.new('fc00::/7'), # Unique local address
     ::IPAddr.new('fe80::/10'), # Link-local address
     ::IPAddr.new('ff00::/8'), # Multicast
-  ].freeze
+  ] + IPV4_BLACKLIST.flat_map do |ipaddr|
+    prefixlen = prefixlen_from_ipaddr(ipaddr)
+
+    ipv4_compatible = ipaddr.ipv4_compat.mask(96 + prefixlen)
+    ipv4_mapped = ipaddr.ipv4_mapped.mask(80 + prefixlen)
+
+    [ipv4_compatible, ipv4_mapped]
+  end).freeze
 
   DEFAULT_SCHEME_WHITELIST = %w[http https].freeze
 
@@ -110,14 +133,7 @@ class SsrfFilter
     return true if ipaddr_has_mask?(ip_address)
 
     return IPV4_BLACKLIST.any? { |range| range.include?(ip_address) } if ip_address.ipv4?
-
-    if ip_address.ipv6?
-      result = IPV6_BLACKLIST.any? { |range| range.include?(ip_address) }
-      # TODO: convert these to be members of IPV6_BLACKLIST
-      result ||= ip_address.ipv4_compat? && IPV4_BLACKLIST.any? { |range| range.include?(ip_address.ipv4_compat) }
-      result ||= ip_address.ipv4_mapped? && IPV4_BLACKLIST.any? { |range| range.include?(ip_address.ipv4_mapped) }
-      return result
-    end
+    return IPV6_BLACKLIST.any? { |range| range.include?(ip_address) } if ip_address.ipv6?
 
     true
   end
