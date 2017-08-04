@@ -93,6 +93,9 @@ class SsrfFilter
   class TooManyRedirects < Error
   end
 
+  class CRLFInjection < Error
+  end
+
   %i[get put post delete].each do |method|
     define_singleton_method(method) do |url, options = {}, &block|
       original_url = url
@@ -166,6 +169,7 @@ class SsrfFilter
     request.body = options[:body] if options[:body]
 
     block.call(request) if block_given?
+    validate_request(request)
 
     use_ssl = uri.scheme == 'https'
     with_forced_hostname(hostname) do
@@ -175,6 +179,19 @@ class SsrfFilter
     end
   end
   private_class_method :fetch_once
+
+  def self.validate_request(request)
+    # RFC822 allows multiline "folded" headers:
+    # https://tools.ietf.org/html/rfc822#section-3.1
+    # In practice if any user input is ever supplied as a header key/value, they'll get
+    # arbitrary header injection and possibly connect to a different host, so we block it
+    request.each do |header, value|
+      if header.count("\r\n") != 0 || value.count("\r\n") != 0
+        raise CRLFInjection, "CRLF injection in header #{header} with value #{value}"
+      end
+    end
+  end
+  private_class_method :validate_request
 
   def self.patch_ssl_socket!
     return if instance_variable_defined?(:@patched_ssl_socket)
