@@ -141,6 +141,28 @@ describe SsrfFilter do
     end
   end
 
+  context 'validate_request' do
+    it 'should disallow header names with newlines and carriage returns' do
+      expect do
+        SsrfFilter.get("https://#{public_ipv4}", headers: {"nam\ne" => 'value'})
+      end.to raise_error(SsrfFilter::CRLFInjection)
+
+      expect do
+        SsrfFilter.get("https://#{public_ipv4}", headers: {"nam\re" => 'value'})
+      end.to raise_error(SsrfFilter::CRLFInjection)
+    end
+
+    it 'should disallow header values with newlines and carriage returns' do
+      expect do
+        SsrfFilter.get("https://#{public_ipv4}", headers: {'name' => "val\nue"})
+      end.to raise_error(SsrfFilter::CRLFInjection)
+
+      expect do
+        SsrfFilter.get("https://#{public_ipv4}", headers: {'name' => "val\rue"})
+      end.to raise_error(SsrfFilter::CRLFInjection)
+    end
+  end
+
   context 'patch_ssl_socket' do
     before :each do
       if SsrfFilter.instance_variable_defined?(:@patched_ssl_socket)
@@ -256,7 +278,7 @@ describe SsrfFilter do
         # https://github.com/ruby/ruby/commit/a6c13d08d7d2035a22855c8f412694d13ba2faa0
         #
         # We need that for this test, so only execute if we're on a revision that has those commits
-        return pending if RUBY_REVISION < 59351
+        skip("RUBY_REVISION #{RUBY_REVISION} is too low") if RUBY_REVISION < 59351
 
         port = 8443
         private_key, certificate = make_keypair('CN=localhost')
