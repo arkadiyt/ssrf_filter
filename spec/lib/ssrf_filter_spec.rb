@@ -207,6 +207,7 @@ describe SsrfFilter do
 
       def make_web_server(port, private_key, certificate, opts = {}, &block)
         server = WEBrick::HTTPServer.new({
+          BindAddress: '127.0.0.1',
           Port: port,
           SSLEnable: true,
           SSLCertificate: certificate,
@@ -401,6 +402,19 @@ describe SsrfFilter do
       expect do
         SsrfFilter.delete('https://www.example.com', resolver: resolver)
       end.to raise_error(SsrfFilter::PrivateIPAddress)
+    end
+
+    it 'should fail when the hostname or path contain linefeeds and carriage returns' do
+      [
+        "https://www.exam\nple.com",
+        "https://www.exam\rple.com",
+        "https://www.example.com/te\nst",
+        "https://www.example.com/te\rst"
+      ].each do |uri|
+        expect do
+          SsrfFilter.get(uri)
+        end.to raise_error(URI::InvalidURIError)
+      end
     end
 
     it 'should follow redirects and succeed on a public hostname' do
