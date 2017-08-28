@@ -15,7 +15,6 @@ Gem::Specification.new do |gem|
 
   gem.add_development_dependency('bundler-audit', '~> 0.6')
   gem.add_development_dependency('coveralls', '~> 0.8')
-  gem.add_development_dependency('pry-byebug', '~> 3.4')
   gem.add_development_dependency('rspec', '~> 3.6')
   gem.add_development_dependency('rubocop', '~> 0.49')
   gem.add_development_dependency('webmock', '~> 3.0')

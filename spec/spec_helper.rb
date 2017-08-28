@@ -2,7 +2,6 @@ require 'coveralls'
 Coveralls.wear!
 ENV['COVERALLS_NOISY'] = '1'
 require 'webmock/rspec'
-require 'pry-byebug'
 require 'ssrf_filter'
 
 def allow_net_connections_for_context(context)
