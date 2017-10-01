@@ -153,13 +153,17 @@ describe SsrfFilter do
     end
 
     it 'should disallow header values with newlines and carriage returns' do
+      # Starting in ruby 2.5, assigning a header value with newlines throws an ArgumentError
+      major, minor = RUBY_VERSION.scan(/\A(\d+)\.(\d+)\.\d+\Z/).first.map(&:to_i)
+      exception = major >= 2 && minor >= 5 ? ArgumentError : SsrfFilter::CRLFInjection
+
       expect do
         SsrfFilter.get("https://#{public_ipv4}", headers: {'name' => "val\nue"})
-      end.to raise_error(SsrfFilter::CRLFInjection)
+      end.to raise_error(exception)
 
       expect do
         SsrfFilter.get("https://#{public_ipv4}", headers: {'name' => "val\rue"})
-      end.to raise_error(SsrfFilter::CRLFInjection)
+      end.to raise_error(exception)
     end
   end
 
