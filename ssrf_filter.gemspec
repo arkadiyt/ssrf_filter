@@ -17,5 +17,5 @@ Gem::Specification.new do |gem|
   gem.add_development_dependency('coveralls', '~> 0.8')
   gem.add_development_dependency('rspec', '~> 3.6')
   gem.add_development_dependency('rubocop', '~> 0.50')
-  gem.add_development_dependency('webmock', '~> 3.0')
+  gem.add_development_dependency('webmock', '~> 3.1')
 end
