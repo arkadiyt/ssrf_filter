@@ -94,7 +94,7 @@ end
 
 ### Changelog
 
-Please see [CHANGELOG.md](https://github.com/arkadiyt/ssrf_filter/blob/master/CHANGELOG.md). This project follows [semantic versioning](http://semver.org/).
+Please see [CHANGELOG.md](https://github.com/arkadiyt/ssrf_filter/blob/master/CHANGELOG.md). This project follows [semantic versioning](https://semver.org/).
 
 ### Contributing
 
