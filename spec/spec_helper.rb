@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'coveralls'
 Coveralls.wear!
 ENV['COVERALLS_NOISY'] = '1'
