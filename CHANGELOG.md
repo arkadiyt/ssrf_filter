@@ -1,3 +1,7 @@
+### 1.0.3 (12/4/2017)
+* Use `frozen_string_literal` pragma in all ruby files
+* Handle new ruby 2.5 behavior when encountering newlines in header names
+
 ### 1.0.2 (8/3/2017)
 * Block newlines and carriage returns in header names/values
 
