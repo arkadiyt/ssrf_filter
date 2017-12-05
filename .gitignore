@@ -1,5 +1,4 @@
 .bundle
 Gemfile.lock
-TODO.md
 coverage/
 vendor/bundle
