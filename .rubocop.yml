@@ -19,11 +19,11 @@ Metrics/MethodLength:
 Layout/SpaceInsideHashLiteralBraces:
   EnforcedStyle: no_space
 
-Layout/MultilineMethodCallBraceLayout:
+Gemspec/RequiredRubyVersion:
   Enabled: false
 
 Layout/MultilineMethodCallIndentation:
-  Enabled: false
+  EnforcedStyle: indented
 
 Style/Documentation:
   Enabled: false
