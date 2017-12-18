@@ -23,7 +23,7 @@ Gem::Specification.new do |gem|
   gem.add_development_dependency('webmock', '~> 3.1')
 
   if major == 2 && minor > 0
-    gem.add_development_dependency('rubocop', '~> 0.51')
+    gem.add_development_dependency('rubocop', '~> 0.52')
   else
     gem.add_development_dependency('rubocop', '~> 0.50.0')
   end
