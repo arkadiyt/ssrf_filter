@@ -17,14 +17,17 @@ Gem::Specification.new do |gem|
 
   major, minor = RUBY_VERSION.scan(/\A(\d+)\.(\d+)\.\d+\Z/).first.map(&:to_i)
 
-  gem.add_development_dependency('bundler-audit', '~> 0.6')
-  gem.add_development_dependency('coveralls', '~> 0.8')
-  gem.add_development_dependency('rspec', '~> 3.7')
-  gem.add_development_dependency('webmock', '~> 3.1')
+  gem.add_development_dependency('bundler-audit', '~> 0.6.0')
+  gem.add_development_dependency('coveralls', '~> 0.8.0')
+  gem.add_development_dependency('rspec', '~> 3.7.0')
+  gem.add_development_dependency('webmock', '~> 3.2.0')
 
   if major == 2 && minor > 0
-    gem.add_development_dependency('rubocop', '~> 0.52')
+    gem.add_development_dependency('rubocop', '~> 0.52.0')
   else
+    # ssrf_filter doesn't use public_suffix directly, it's required by `addressable` which is required
+    # by `webmock`. We need to set this requirement here to pin a version that is compatible with ruby 2.0
+    gem.add_development_dependency('public_suffix', '2.0.5')
     gem.add_development_dependency('rubocop', '~> 0.50.0')
   end
 end
