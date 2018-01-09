@@ -6,6 +6,7 @@ rvm:
   - ruby-2.2
   - ruby-2.3
   - ruby-2.4
+  - ruby-2.5
   - ruby-head
 script:
   - bundle exec bundler-audit
