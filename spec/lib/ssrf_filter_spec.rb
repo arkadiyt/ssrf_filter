@@ -438,5 +438,20 @@ describe SsrfFilter do
       expect(response.code).to eq('200')
       expect(response.body).to eq('response body')
     end
+
+    it 'should follow relative redirects and succeed' do
+      stub_request(:post, "https://#{public_ipv4}/path?key=value").with(headers: {host: 'www.example.com:443'})
+        .to_return(status: 301, headers: {location: '/path2?key2=value2'})
+      stub_request(:post, "https://#{public_ipv4}/path2?key2=value2")
+        .with(headers: {host: 'www.example.com:443'}).to_return(status: 200, body: 'response body')
+      resolver = proc do |hostname|
+        [{
+          'www.example.com' => public_ipv4
+        }[hostname]]
+      end
+      response = SsrfFilter.post('https://www.example.com/path?key=value', resolver: resolver)
+      expect(response.code).to eq('200')
+      expect(response.body).to eq('response body')
+    end
   end
 end
