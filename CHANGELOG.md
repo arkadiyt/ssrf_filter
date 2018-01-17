@@ -1,3 +1,6 @@
+### 1.0.4 (1/17/2017)
+* Handle relative redirects
+
 ### 1.0.3 (12/4/2017)
 * Use `frozen_string_literal` pragma in all ruby files
 * Handle new ruby 2.5 behavior when encountering newlines in header names
