@@ -80,16 +80,32 @@ describe SsrfFilter do
 
   context 'fetch_once' do
     it 'should set the host header' do
-      stub_request(:post, "https://#{public_ipv4}").with(headers: {host: 'www.example.com:443'})
+      stub_request(:post, "https://#{public_ipv4}").with(headers: {host: 'www.example.com'})
         .to_return(status: 200, body: 'response body')
       response = SsrfFilter.fetch_once(URI('https://www.example.com'), public_ipv4.to_s, :post, {})
       expect(response.code).to eq('200')
       expect(response.body).to eq('response body')
     end
 
+    it 'should not send the port in the host header for default ports (http)' do
+      stub_request(:post, "http://#{public_ipv4}").with(headers: {host: 'www.example.com'})
+        .to_return(status: 200, body: 'response body')
+      response = SsrfFilter.fetch_once(URI('http://www.example.com'), public_ipv4.to_s, :post, {})
+      expect(response.code).to eq('200')
+      expect(response.body).to eq('response body')
+    end
+
+    it 'should send the port in the host header for non-default ports' do
+      stub_request(:post, "https://#{public_ipv4}:80").with(headers: {host: 'www.example.com:80'})
+        .to_return(status: 200, body: 'response body')
+      response = SsrfFilter.fetch_once(URI('https://www.example.com:80'), public_ipv4.to_s, :post, {})
+      expect(response.code).to eq('200')
+      expect(response.body).to eq('response body')
+    end
+
     it 'should pass headers, params, and blocks' do
       stub_request(:get, "https://#{public_ipv4}/?key=value").with(headers:
-        {host: 'www.example.com:443', header: 'value', header2: 'value2'}).to_return(status: 200, body: 'response body')
+        {host: 'www.example.com', header: 'value', header2: 'value2'}).to_return(status: 200, body: 'response body')
       options = {
         headers: {'header' => 'value'},
         params: {'key' => 'value'}
@@ -104,7 +120,7 @@ describe SsrfFilter do
 
     it 'should merge params' do
       stub_request(:get, "https://#{public_ipv4}/?key=value&key2=value2")
-        .with(headers: {host: 'www.example.com:443'}).to_return(status: 200, body: 'response body')
+        .with(headers: {host: 'www.example.com'}).to_return(status: 200, body: 'response body')
       uri = URI('https://www.example.com/?key=value')
       response = SsrfFilter.fetch_once(uri, public_ipv4.to_s, :get, params: {'key2' => 'value2'})
       expect(response.code).to eq('200')
@@ -379,7 +395,7 @@ describe SsrfFilter do
     end
 
     it 'should fail if there are too many redirects' do
-      stub_request(:get, "https://#{public_ipv4}").with(headers: {host: 'www.example.com:443'})
+      stub_request(:get, "https://#{public_ipv4}").with(headers: {host: 'www.example.com'})
         .to_return(status: 301, headers: {location: private_ipv4})
       resolver = proc { [public_ipv4] }
       expect do
@@ -388,7 +404,7 @@ describe SsrfFilter do
     end
 
     it 'should fail if the redirected url is not in the scheme whitelist' do
-      stub_request(:put, "https://#{public_ipv4}").with(headers: {host: 'www.example.com:443'})
+      stub_request(:put, "https://#{public_ipv4}").with(headers: {host: 'www.example.com'})
         .to_return(status: 301, headers: {location: 'ftp://www.example.com'})
       resolver = proc { [public_ipv4] }
       expect do
@@ -397,7 +413,7 @@ describe SsrfFilter do
     end
 
     it 'should fail if the redirected url has no public ip address' do
-      stub_request(:delete, "https://#{public_ipv4}").with(headers: {host: 'www.example.com:443'})
+      stub_request(:delete, "https://#{public_ipv4}").with(headers: {host: 'www.example.com'})
         .to_return(status: 301, headers: {location: 'https://www.example2.com'})
       resolver = proc do |hostname|
         [{
@@ -424,10 +440,10 @@ describe SsrfFilter do
     end
 
     it 'should follow redirects and succeed on a public hostname' do
-      stub_request(:post, "https://#{public_ipv4}/path?key=value").with(headers: {host: 'www.example.com:443'})
+      stub_request(:post, "https://#{public_ipv4}/path?key=value").with(headers: {host: 'www.example.com'})
         .to_return(status: 301, headers: {location: 'https://www.example2.com/path2?key2=value2'})
       stub_request(:post, "https://#{public_ipv6}/path2?key2=value2")
-        .with(headers: {host: 'www.example2.com:443'}).to_return(status: 200, body: 'response body')
+        .with(headers: {host: 'www.example2.com'}).to_return(status: 200, body: 'response body')
       resolver = proc do |hostname|
         [{
           'www.example.com' => public_ipv4,
@@ -440,10 +456,10 @@ describe SsrfFilter do
     end
 
     it 'should follow relative redirects and succeed' do
-      stub_request(:post, "https://#{public_ipv4}/path?key=value").with(headers: {host: 'www.example.com:443'})
+      stub_request(:post, "https://#{public_ipv4}/path?key=value").with(headers: {host: 'www.example.com'})
         .to_return(status: 301, headers: {location: '/path2?key2=value2'})
       stub_request(:post, "https://#{public_ipv4}/path2?key2=value2")
-        .with(headers: {host: 'www.example.com:443'}).to_return(status: 200, body: 'response body')
+        .with(headers: {host: 'www.example.com'}).to_return(status: 200, body: 'response body')
       resolver = proc do |hostname|
         [{
           'www.example.com' => public_ipv4
