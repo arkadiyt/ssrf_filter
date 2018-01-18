@@ -1,4 +1,7 @@
-### 1.0.4 (1/17/2017)
+### 1.0.5 (1/17/2018)
+* Don't send the port number in the Host header if it's HTTPS and on port 443
+
+### 1.0.4 (1/17/2018)
 * Handle relative redirects
 
 ### 1.0.3 (12/4/2017)
