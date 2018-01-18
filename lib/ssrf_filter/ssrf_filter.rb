@@ -152,6 +152,17 @@ class SsrfFilter
   end
   private_class_method :ipaddr_has_mask?
 
+  def self.host_header(hostname, uri)
+    # Attach port for non-default as per RFC2616
+    if (uri.port == 80 && uri.scheme == 'http') ||
+       (uri.port == 443 && uri.scheme == 'https')
+      hostname
+    else
+      "#{hostname}:#{uri.port}"
+    end
+  end
+  private_class_method :host_header
+
   def self.fetch_once(uri, ip, verb, options, &block)
     if options[:params]
       params = uri.query ? ::Hash[::URI.decode_www_form(uri.query)] : {}
@@ -163,8 +174,7 @@ class SsrfFilter
     uri.hostname = ip
 
     request = VERB_MAP[verb].new(uri)
-    # Attach port for non-80 as per RFC2616
-    request['host'] = uri.port == 80 ? hostname : "#{hostname}:#{uri.port}"
+    request['host'] = host_header(hostname, uri)
 
     Array(options[:headers]).each do |header, value|
       request[header] = value
