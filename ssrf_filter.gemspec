@@ -20,7 +20,7 @@ Gem::Specification.new do |gem|
   gem.add_development_dependency('bundler-audit', '~> 0.6.0')
   gem.add_development_dependency('coveralls', '~> 0.8.0')
   gem.add_development_dependency('rspec', '~> 3.7.0')
-  gem.add_development_dependency('webmock', '~> 3.2.0')
+  gem.add_development_dependency('webmock', '~> 3.3.0')
 
   if major == 2 && minor > 0
     gem.add_development_dependency('rubocop', '~> 0.52.0')
