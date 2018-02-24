@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require 'spec_helper'
 require 'timeout'
 require 'webrick/https'
 
@@ -185,170 +184,162 @@ describe SsrfFilter do
     end
   end
 
-  context 'patch_ssl_socket' do
-    before :each do
-      if SsrfFilter.instance_variable_defined?(:@patched_ssl_socket)
-        SsrfFilter.remove_instance_variable(:@patched_ssl_socket)
+  context 'integration tests' do
+    # To test the SSLSocket patching logic (and hit 100% code coverage), we need to make a real connection to a
+    # TLS-enabled server. To do this we create a private key and certificate, spin up a web server in
+    # a thread (serving traffic on localhost), and make a request to the server. This requires several things:
+    # 1) creating a custom trust store with our certificate and using that for validation
+    # 2) allowing (non-mocked) network connections
+    # 3) stubbing out the IPV4_BLACKLIST to allow connections to localhost
+
+    allow_net_connections_for_context(self)
+
+    def make_keypair(subject)
+      private_key = OpenSSL::PKey::RSA.new(2048)
+      public_key = private_key.public_key
+      subject = OpenSSL::X509::Name.parse(subject)
+
+      certificate = OpenSSL::X509::Certificate.new
+      certificate.subject = subject
+      certificate.issuer = subject
+      certificate.not_before = Time.now
+      certificate.not_after = Time.now + 60 * 60 * 24
+      certificate.public_key = public_key
+      certificate.serial = 0x0
+      certificate.version = 2
+
+      certificate.sign(private_key, OpenSSL::Digest::SHA256.new)
+
+      [private_key, certificate]
+    end
+
+    def make_web_server(port, private_key, certificate, opts = {}, &block)
+      server = WEBrick::HTTPServer.new({
+        BindAddress: '127.0.0.1',
+        Port: port,
+        SSLEnable: true,
+        SSLCertificate: certificate,
+        SSLPrivateKey: private_key,
+        StartCallback: block
+      }.merge(opts))
+
+      server.mount_proc '/' do |req, res|
+        res.status = 200
+        res['X-Subject'] = certificate.subject
+        res['X-Host'] = req['host']
+      end
+
+      server
+    end
+
+    def inject_custom_trust_store(*certificates)
+      store = OpenSSL::X509::Store.new
+      certificates.each do |certificate|
+        store.add_cert(certificate)
+      end
+
+      expect(::Net::HTTP).to receive(:start).exactly(certificates.length).times
+        .and_wrap_original do |orig, *args, &block|
+
+        args.last[:cert_store] = store # Inject our custom trust store
+        orig.call(*args, &block)
       end
     end
 
-    it 'should only patch once' do
-      expect(::OpenSSL::SSL::SSLSocket).to receive(:class_eval)
-      SsrfFilter.patch_ssl_socket!
-      SsrfFilter.patch_ssl_socket!
+    it 'should successfully validate TLS certificates' do
+      hostname = 'ssrf-filter.example.com'
+      port = 8443
+      private_key, certificate = make_keypair("CN=#{hostname}")
+      stub_const('SsrfFilter::IPV4_BLACKLIST', [])
+
+      inject_custom_trust_store(certificate)
+
+      begin
+        called = false
+        rspec_thread = Thread.new do
+          Thread.stop
+          response = SsrfFilter.get("https://#{hostname}:#{port}", resolver: proc { [IPAddr.new('127.0.0.1')] })
+          expect(response.code).to eq('200')
+          expect(response['X-Subject']).to eq("/CN=#{hostname}")
+          expect(response['X-Host']).to eq("#{hostname}:#{port}")
+          called = true
+        end
+
+        server = make_web_server(port, private_key, certificate) do
+          rspec_thread.wakeup
+        end
+
+        web_server_thread = Thread.new do
+          server.start
+        end
+
+        Timeout.timeout(5) do
+          rspec_thread.join
+          expect(called).to be(true)
+        end
+      ensure
+        rspec_thread.kill unless rspec_thread.nil?
+        web_server_thread.kill unless web_server_thread.nil?
+      end
     end
 
-    context 'integration tests' do
-      # To test the SSLSocket patching logic (and hit 100% code coverage), we need to make a real connection to a
-      # TLS-enabled server. To do this we create a private key and certificate, spin up a web server in
-      # a thread (serving traffic on localhost), and make a request to the server. This requires several things:
-      # 1) creating a custom trust store with our certificate and using that for validation
-      # 2) allowing (non-mocked) network connections
-      # 3) stubbing out the IPV4_BLACKLIST to allow connections to localhost
+    it 'should successfully connect when using SNI' do
+      # SNI was broken in WEBRick until the following commits on ruby-head:
+      # https://github.com/ruby/ruby/commit/08bdbef5cabeb1a8b84b9ddf7a3137289620d46b
+      # https://github.com/ruby/ruby/commit/a6c13d08d7d2035a22855c8f412694d13ba2faa0
+      #
+      # We need that for this test, so only execute if we're on a revision that has those commits
+      require 'webrick/https'
+      supports_sni = WEBrick.const_defined?(:SNIRequest)
+      skip("RUBY_REVISION #{RUBY_REVISION} is too low") unless supports_sni
 
-      allow_net_connections_for_context(self)
+      port = 8443
+      private_key, certificate = make_keypair('CN=localhost')
+      virtualhost_private_key, virtualhost_certificate = make_keypair('CN=virtualhost')
+      stub_const('SsrfFilter::IPV4_BLACKLIST', [])
 
-      def make_keypair(subject)
-        private_key = OpenSSL::PKey::RSA.new(2048)
-        public_key = private_key.public_key
-        subject = OpenSSL::X509::Name.parse(subject)
+      inject_custom_trust_store(certificate, virtualhost_certificate)
 
-        certificate = OpenSSL::X509::Certificate.new
-        certificate.subject = subject
-        certificate.issuer = subject
-        certificate.not_before = Time.now
-        certificate.not_after = Time.now + 60 * 60 * 24
-        certificate.public_key = public_key
-        certificate.serial = 0x0
-        certificate.version = 2
+      begin
+        called = false
+        rspec_thread = Thread.new do
+          Thread.stop
+          options = {
+            resolver: proc { [IPAddr.new('127.0.0.1')] }
+          }
 
-        certificate.sign(private_key, OpenSSL::Digest::SHA256.new)
+          response = SsrfFilter.get("https://localhost:#{port}", options)
+          expect(response.code).to eq('200')
+          expect(response['X-Subject']).to eq('/CN=localhost')
+          expect(response['X-Host']).to eq("localhost:#{port}")
 
-        [private_key, certificate]
-      end
+          response = SsrfFilter.get("https://virtualhost:#{port}", options)
+          expect(response.code).to eq('200')
+          expect(response['X-Subject']).to eq('/CN=virtualhost')
+          expect(response['X-Host']).to eq("virtualhost:#{port}")
 
-      def make_web_server(port, private_key, certificate, opts = {}, &block)
-        server = WEBrick::HTTPServer.new({
-          BindAddress: '127.0.0.1',
-          Port: port,
-          SSLEnable: true,
-          SSLCertificate: certificate,
-          SSLPrivateKey: private_key,
-          StartCallback: block
-        }.merge(opts))
-
-        server.mount_proc '/' do |_, res|
-          res.status = 200
-          res.body = "webrick #{certificate.subject}"
+          called = true
         end
 
-        server
-      end
-
-      def inject_custom_trust_store(*certificates)
-        store = OpenSSL::X509::Store.new
-        certificates.each do |certificate|
-          store.add_cert(certificate)
+        server = make_web_server(port, private_key, certificate, ServerName: 'localhost') do
+          rspec_thread.wakeup
         end
 
-        expect(::Net::HTTP).to receive(:start).exactly(certificates.length).times
-          .and_wrap_original do |orig, *args, &block|
+        options = {ServerName: 'virtualhost', DoNotListen: true}
+        virtualhost = make_web_server(port, virtualhost_private_key, virtualhost_certificate, options)
+        server.virtual_host(virtualhost)
 
-          args.last[:cert_store] = store # Inject our custom trust store
-          orig.call(*args, &block)
+        web_server_thread = Thread.new do
+          server.start
         end
-      end
 
-      it 'should successfully validate TLS certificates' do
-        hostname = 'ssrf-filter.example.com'
-        port = 8443
-        private_key, certificate = make_keypair("CN=#{hostname}")
-        stub_const('SsrfFilter::IPV4_BLACKLIST', [])
-
-        inject_custom_trust_store(certificate)
-
-        begin
-          called = false
-          rspec_thread = Thread.new do
-            Thread.stop
-            response = SsrfFilter.get("https://#{hostname}:#{port}", resolver: proc { [IPAddr.new('127.0.0.1')] })
-            expect(response.code).to eq('200')
-            expect(response.body).to eq('webrick /CN=ssrf-filter.example.com')
-            called = true
-          end
-
-          server = make_web_server(port, private_key, certificate) do
-            rspec_thread.wakeup
-          end
-
-          web_server_thread = Thread.new do
-            server.start
-          end
-
-          Timeout.timeout(5) do
-            rspec_thread.join
-            expect(called).to be(true)
-          end
-        ensure
-          rspec_thread.kill unless rspec_thread.nil?
-          web_server_thread.kill unless web_server_thread.nil?
+        Timeout.timeout(5) do
+          rspec_thread.join
+          expect(called).to be(true)
         end
-      end
-
-      it 'should successfully connect when using SNI' do
-        # SNI was broken in WEBRick until the following commits on ruby-head:
-        # https://github.com/ruby/ruby/commit/08bdbef5cabeb1a8b84b9ddf7a3137289620d46b
-        # https://github.com/ruby/ruby/commit/a6c13d08d7d2035a22855c8f412694d13ba2faa0
-        #
-        # We need that for this test, so only execute if we're on a revision that has those commits
-        skip("RUBY_REVISION #{RUBY_REVISION} is too low") if RUBY_REVISION < 59351
-
-        port = 8443
-        private_key, certificate = make_keypair('CN=localhost')
-        virtualhost_private_key, virtualhost_certificate = make_keypair('CN=virtualhost')
-        stub_const('SsrfFilter::IPV4_BLACKLIST', [])
-
-        inject_custom_trust_store(certificate, virtualhost_certificate)
-
-        begin
-          called = false
-          rspec_thread = Thread.new do
-            Thread.stop
-            options = {
-              resolver: proc { [IPAddr.new('127.0.0.1')] }
-            }
-
-            response = SsrfFilter.get("https://localhost:#{port}", options)
-            expect(response.code).to eq('200')
-            expect(response.body).to eq('webrick /CN=localhost')
-
-            response = SsrfFilter.get("https://virtualhost:#{port}", options)
-            expect(response.code).to eq('200')
-            expect(response.body).to eq('webrick /CN=virtualhost')
-
-            called = true
-          end
-
-          server = make_web_server(port, private_key, certificate, ServerName: 'localhost') do
-            rspec_thread.wakeup
-          end
-
-          options = {ServerName: 'virtualhost', DoNotListen: true}
-          virtualhost = make_web_server(port, virtualhost_private_key, virtualhost_certificate, options)
-          server.virtual_host(virtualhost)
-
-          web_server_thread = Thread.new do
-            server.start
-          end
-
-          Timeout.timeout(5) do
-            rspec_thread.join
-            expect(called).to be(true)
-          end
-        ensure
-          rspec_thread.kill unless rspec_thread.nil?
-          web_server_thread.kill unless web_server_thread.nil?
-        end
+      ensure
+        rspec_thread.kill unless rspec_thread.nil?
+        web_server_thread.kill unless web_server_thread.nil?
       end
     end
   end
