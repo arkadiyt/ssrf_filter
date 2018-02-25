@@ -255,30 +255,22 @@ describe SsrfFilter do
       inject_custom_trust_store(certificate)
 
       begin
-        called = false
-        rspec_thread = Thread.new do
-          Thread.stop
+        queue = Queue.new # Used as a semaphore
+
+        web_server_thread = Thread.new do
+          make_web_server(port, private_key, certificate) do
+            queue.push(nil)
+          end.start
+        end
+
+        Timeout.timeout(2) do
+          queue.pop
           response = SsrfFilter.get("https://#{hostname}:#{port}", resolver: proc { [IPAddr.new('127.0.0.1')] })
           expect(response.code).to eq('200')
           expect(response['X-Subject']).to eq("/CN=#{hostname}")
           expect(response['X-Host']).to eq("#{hostname}:#{port}")
-          called = true
-        end
-
-        server = make_web_server(port, private_key, certificate) do
-          rspec_thread.wakeup
-        end
-
-        web_server_thread = Thread.new do
-          server.start
-        end
-
-        Timeout.timeout(5) do
-          rspec_thread.join
-          expect(called).to be(true)
         end
       ensure
-        rspec_thread.kill unless rspec_thread.nil?
         web_server_thread.kill unless web_server_thread.nil?
       end
     end
@@ -301,9 +293,23 @@ describe SsrfFilter do
       inject_custom_trust_store(certificate, virtualhost_certificate)
 
       begin
-        called = false
-        rspec_thread = Thread.new do
-          Thread.stop
+        queue = Queue.new # Used as a semaphore
+
+        web_server_thread = Thread.new do
+          server = make_web_server(port, private_key, certificate, ServerName: 'localhost') do
+            queue.push(nil)
+          end
+
+          options = {ServerName: 'virtualhost', DoNotListen: true}
+          virtualhost = make_web_server(port, virtualhost_private_key, virtualhost_certificate, options)
+          server.virtual_host(virtualhost)
+
+          server.start
+        end
+
+        Timeout.timeout(2) do
+          queue.pop
+
           options = {
             resolver: proc { [IPAddr.new('127.0.0.1')] }
           }
@@ -317,28 +323,8 @@ describe SsrfFilter do
           expect(response.code).to eq('200')
           expect(response['X-Subject']).to eq('/CN=virtualhost')
           expect(response['X-Host']).to eq("virtualhost:#{port}")
-
-          called = true
-        end
-
-        server = make_web_server(port, private_key, certificate, ServerName: 'localhost') do
-          rspec_thread.wakeup
-        end
-
-        options = {ServerName: 'virtualhost', DoNotListen: true}
-        virtualhost = make_web_server(port, virtualhost_private_key, virtualhost_certificate, options)
-        server.virtual_host(virtualhost)
-
-        web_server_thread = Thread.new do
-          server.start
-        end
-
-        Timeout.timeout(5) do
-          rspec_thread.join
-          expect(called).to be(true)
         end
       ensure
-        rspec_thread.kill unless rspec_thread.nil?
         web_server_thread.kill unless web_server_thread.nil?
       end
     end
