@@ -57,7 +57,8 @@ class SsrfFilter
   ] + IPV4_BLACKLIST.flat_map do |ipaddr|
     prefixlen = prefixlen_from_ipaddr(ipaddr)
 
-    ipv4_compatible = ipaddr.ipv4_compat.mask(96 + prefixlen)
+    # Don't call ipaddr.ipv4_compat because it prints out a deprecation warning on ruby 2.5+
+    ipv4_compatible = IPAddr.new(ipaddr.to_i, Socket::AF_INET6).mask(96 + prefixlen)
     ipv4_mapped = ipaddr.ipv4_mapped.mask(80 + prefixlen)
 
     [ipv4_compatible, ipv4_mapped]
