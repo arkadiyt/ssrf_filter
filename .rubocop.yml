@@ -16,6 +16,9 @@ Metrics/LineLength:
 Metrics/MethodLength:
   Enabled: false
 
+Naming/UncommunicativeMethodParamName:
+  Enabled: false
+
 Layout/SpaceInsideHashLiteralBraces:
   EnforcedStyle: no_space
 

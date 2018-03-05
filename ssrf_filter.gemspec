@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-$LOAD_PATH.unshift File.expand_path('../lib', __FILE__)
+$LOAD_PATH.unshift File.expand_path('lib', __dir__)
 require 'ssrf_filter/version'
 
 Gem::Specification.new do |gem|
@@ -23,7 +23,7 @@ Gem::Specification.new do |gem|
   gem.add_development_dependency('webmock', '~> 3.3.0')
 
   if major == 2 && minor > 0
-    gem.add_development_dependency('rubocop', '~> 0.52.0')
+    gem.add_development_dependency('rubocop', '~> 0.53.0')
   else
     # ssrf_filter doesn't use public_suffix directly, it's required by `addressable` which is required
     # by `webmock`. We need to set this requirement here to pin a version that is compatible with ruby 2.0
