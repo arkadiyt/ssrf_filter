@@ -27,6 +27,7 @@ class SsrfFilter
 
       def self.apply!
         return if instance_variable_defined?(:@patched_ssl_socket)
+
         @patched_ssl_socket = true
 
         ::OpenSSL::SSL::SSLSocket.class_eval do
