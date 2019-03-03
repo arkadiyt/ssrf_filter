@@ -53,7 +53,7 @@ class SsrfFilter
     ::IPAddr.new('2002::/16'), # 6to4
     ::IPAddr.new('fc00::/7'), # Unique local address
     ::IPAddr.new('fe80::/10'), # Link-local address
-    ::IPAddr.new('ff00::/8'), # Multicast
+    ::IPAddr.new('ff00::/8') # Multicast
   ] + IPV4_BLACKLIST.flat_map do |ipaddr|
     prefixlen = prefixlen_from_ipaddr(ipaddr)
 
