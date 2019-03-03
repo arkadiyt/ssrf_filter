@@ -17,7 +17,7 @@ Gem::Specification.new do |gem|
 
   major, minor = RUBY_VERSION.scan(/\A(\d+)\.(\d+)\.\d+\Z/).first.map(&:to_i)
 
-  gem.add_development_dependency('bundler-audit', '~> 0.6.0')
+  gem.add_development_dependency('bundler-audit', '~> 0.6.1')
   gem.add_development_dependency('coveralls', '~> 0.8.22')
   gem.add_development_dependency('rspec', '~> 3.8.0')
   gem.add_development_dependency('webmock', '~> 3.5.1')
@@ -25,7 +25,7 @@ Gem::Specification.new do |gem|
   raise 'Unsupported version of ruby' unless major == 2
 
   if minor > 1
-    gem.add_development_dependency('rubocop', '~> 0.61.1')
+    gem.add_development_dependency('rubocop', '~> 0.65.0')
   elsif minor == 1
     gem.add_development_dependency('rubocop', '~> 0.57.2')
   else
