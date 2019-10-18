@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require 'coveralls'
+require 'simplecov'
+SimpleCov.add_filter('spec')
 Coveralls.wear!
 ENV['COVERALLS_NOISY'] = '1'
 require 'webmock/rspec'
