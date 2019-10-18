@@ -190,9 +190,8 @@ class SsrfFilter
     validate_request(request)
     
     http_options = options[:http_options] || {}
-    http_options[:use_ssl] = use_ssl
+    http_options[:use_ssl] = (uri.scheme == 'https')
 
-    use_ssl = uri.scheme == 'https'
     with_forced_hostname(hostname) do
       ::Net::HTTP.start(uri.hostname, uri.port, http_options) do |http|
         http.request(request)
