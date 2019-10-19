@@ -188,7 +188,7 @@ class SsrfFilter
 
     block.call(request) if block_given?
     validate_request(request)
-    
+
     http_options = options[:http_options] || {}
     http_options[:use_ssl] = (uri.scheme == 'https')
 
