@@ -1,3 +1,6 @@
+### 1.0.7 (10/21/2019)
+* Allow passing custom options to Net::HTTP.start ([groe](https://github.com/groe))
+
 ### 1.0.6 (2/24/2018)
 * Backport a fix for a [bug](https://bugs.ruby-lang.org/issues/10054) in Ruby's http library
 
