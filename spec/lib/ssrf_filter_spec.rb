@@ -135,6 +135,15 @@ describe SsrfFilter do
       expect(::Net::HTTP).to receive(:start).with(public_ipv4.to_s, 443, use_ssl: true)
       SsrfFilter.fetch_once(URI('https://www.example.com'), public_ipv4.to_s, :get, {})
     end
+
+    it 'should return an enumerator for chunked responses' do
+      stub_request(:get, "https://#{public_ipv4}")
+        .with(headers: {host: 'www.example.com'}).to_return(status: 200, body: 'response body')
+      uri = URI('https://www.example.com')
+      response = SsrfFilter.fetch_once(uri, public_ipv4.to_s, :get, chunked: true)
+      expect(response).to be_a_kind_of(Enumerator)
+      expect(response.next).to eq('response body')
+    end
   end
 
   context 'with_forced_hostname' do

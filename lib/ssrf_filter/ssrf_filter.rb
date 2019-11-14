@@ -192,9 +192,19 @@ class SsrfFilter
     http_options = options[:http_options] || {}
     http_options[:use_ssl] = (uri.scheme == 'https')
 
-    with_forced_hostname(hostname) do
-      ::Net::HTTP.start(uri.hostname, uri.port, http_options) do |http|
-        http.request(request)
+    ::Net::HTTP.start(uri.hostname, uri.port, http_options) do |http|
+      if options[:chunked]
+        Enumerator.new do |yielder|
+          with_forced_hostname(hostname) do
+            http.request(request) do |response|
+              response.read_body { |chunk| yielder << chunk }
+            end
+          end
+        end
+      else
+        with_forced_hostname(hostname) do
+          http.request(request)
+        end
       end
     end
   end
