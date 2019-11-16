@@ -193,19 +193,7 @@ class SsrfFilter
     http_options[:use_ssl] = (uri.scheme == 'https')
 
     ::Net::HTTP.start(uri.hostname, uri.port, http_options) do |http|
-      if options[:chunked]
-        Enumerator.new do |yielder|
-          with_forced_hostname(hostname) do
-            http.request(request) do |response|
-              response.read_body { |chunk| yielder << chunk }
-            end
-          end
-        end
-      else
-        with_forced_hostname(hostname) do
-          http.request(request)
-        end
-      end
+      make_request(http, request, hostname, options[:chunked])
     end
   end
   private_class_method :fetch_once
@@ -230,4 +218,21 @@ class SsrfFilter
     ::Thread.current[FIBER_LOCAL_KEY] = nil
   end
   private_class_method :with_forced_hostname
+
+  def self.make_request(http, request, hostname, chunked)
+    if chunked
+      Enumerator.new do |yielder|
+        with_forced_hostname(hostname) do
+          http.request(request) do |response|
+            response.read_body { |chunk| yielder << chunk }
+          end
+        end
+      end
+    else
+      with_forced_hostname(hostname) do
+        http.request(request)
+      end
+    end
+  end
+  private_class_method :make_request
 end
