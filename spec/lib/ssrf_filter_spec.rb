@@ -81,25 +81,28 @@ describe SsrfFilter do
     it 'should set the host header' do
       stub_request(:post, "https://#{public_ipv4}").with(headers: {host: 'www.example.com'})
         .to_return(status: 200, body: 'response body')
-      response = SsrfFilter.fetch_once(URI('https://www.example.com'), public_ipv4.to_s, :post, {})
+      response, url = SsrfFilter.fetch_once(URI('https://www.example.com'), public_ipv4.to_s, :post, {})
       expect(response.code).to eq('200')
       expect(response.body).to eq('response body')
+      expect(url).to eq(nil)
     end
 
     it 'should not send the port in the host header for default ports (http)' do
       stub_request(:post, "http://#{public_ipv4}").with(headers: {host: 'www.example.com'})
         .to_return(status: 200, body: 'response body')
-      response = SsrfFilter.fetch_once(URI('http://www.example.com'), public_ipv4.to_s, :post, {})
+      response, url = SsrfFilter.fetch_once(URI('http://www.example.com'), public_ipv4.to_s, :post, {})
       expect(response.code).to eq('200')
       expect(response.body).to eq('response body')
+      expect(url).to eq(nil)
     end
 
     it 'should send the port in the host header for non-default ports' do
       stub_request(:post, "https://#{public_ipv4}:80").with(headers: {host: 'www.example.com:80'})
         .to_return(status: 200, body: 'response body')
-      response = SsrfFilter.fetch_once(URI('https://www.example.com:80'), public_ipv4.to_s, :post, {})
+      response, url = SsrfFilter.fetch_once(URI('https://www.example.com:80'), public_ipv4.to_s, :post, {})
       expect(response.code).to eq('200')
       expect(response.body).to eq('response body')
+      expect(url).to eq(nil)
     end
 
     it 'should pass headers, params, and blocks' do
@@ -107,23 +110,26 @@ describe SsrfFilter do
         {host: 'www.example.com', header: 'value', header2: 'value2'}).to_return(status: 200, body: 'response body')
       options = {
         headers: {'header' => 'value'},
-        params: {'key' => 'value'}
+        params: {'key' => 'value'},
+        request_proc: proc do |req|
+          req['header2'] = 'value2'
+        end
       }
       uri = URI('https://www.example.com/?key=value')
-      response = SsrfFilter.fetch_once(uri, public_ipv4.to_s, :get, options) do |req|
-        req['header2'] = 'value2'
-      end
+      response, url = SsrfFilter.fetch_once(uri, public_ipv4.to_s, :get, options)
       expect(response.code).to eq('200')
       expect(response.body).to eq('response body')
+      expect(url).to eq(nil)
     end
 
     it 'should merge params' do
       stub_request(:get, "https://#{public_ipv4}/?key=value&key2=value2")
         .with(headers: {host: 'www.example.com'}).to_return(status: 200, body: 'response body')
       uri = URI('https://www.example.com/?key=value')
-      response = SsrfFilter.fetch_once(uri, public_ipv4.to_s, :get, params: {'key2' => 'value2'})
+      response, url = SsrfFilter.fetch_once(uri, public_ipv4.to_s, :get, params: {'key2' => 'value2'})
       expect(response.code).to eq('200')
       expect(response.body).to eq('response body')
+      expect(url).to eq(nil)
     end
 
     it 'should not use tls for http urls' do
@@ -134,15 +140,6 @@ describe SsrfFilter do
     it 'should use tls for https urls' do
       expect(::Net::HTTP).to receive(:start).with(public_ipv4.to_s, 443, use_ssl: true)
       SsrfFilter.fetch_once(URI('https://www.example.com'), public_ipv4.to_s, :get, {})
-    end
-
-    it 'should return an enumerator for chunked responses' do
-      stub_request(:get, "https://#{public_ipv4}")
-        .with(headers: {host: 'www.example.com'}).to_return(status: 200, body: 'response body')
-      uri = URI('https://www.example.com')
-      response = SsrfFilter.fetch_once(uri, public_ipv4.to_s, :get, chunked: true)
-      expect(response).to be_a_kind_of(Enumerator)
-      expect(response.next).to eq('response body')
     end
   end
 
@@ -332,6 +329,54 @@ describe SsrfFilter do
           expect(response.code).to eq('200')
           expect(response['X-Subject']).to eq('/CN=virtualhost')
           expect(response['X-Host']).to eq("virtualhost:#{port}")
+        end
+      ensure
+        web_server_thread.kill unless web_server_thread.nil?
+      end
+    end
+
+    it 'should support chunked responses' do
+      hostname = 'ssrf-filter.example.com'
+      port = 8443
+
+      private_key, certificate = make_keypair("CN=#{hostname}")
+      inject_custom_trust_store(certificate)
+      stub_const('SsrfFilter::IPV4_BLACKLIST', [])
+
+      begin
+        queue = Queue.new # Used as a semaphore
+
+        chunks = ['chunk 1', 'chunk 2', 'chunk 3']
+
+        web_server_thread = Thread.new do
+          server = make_web_server(port, private_key, certificate) do
+            queue.push(nil)
+          end
+
+          server.mount_proc '/chunked' do |_, res|
+            res.status = 200
+            res.chunked = true
+            res.body = proc do |chunked_wrapper|
+              chunks.each { |chunk| chunked_wrapper.write(chunk) }
+            end
+          end
+
+          server.start
+        end
+
+        Timeout.timeout(2) do
+          queue.pop
+
+          chunk_index = 0
+          url = "https://#{hostname}:#{port}/chunked"
+          SsrfFilter.get(url, resolver: proc { [IPAddr.new('127.0.0.1')] }) do |response|
+            expect(response.code).to eq('200')
+            response.read_body do |chunk|
+              expect(chunk).to eq(chunks[chunk_index])
+              chunk_index += 1
+            end
+          end
+          expect(chunk_index).to eq(chunks.length)
         end
       ensure
         web_server_thread.kill unless web_server_thread.nil?

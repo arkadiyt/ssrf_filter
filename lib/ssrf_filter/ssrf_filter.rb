@@ -124,16 +124,8 @@ class SsrfFilter
         public_addresses = ip_addresses.reject(&method(:unsafe_ip_address?))
         raise PrivateIPAddress, "Hostname '#{hostname}' has no public ip addresses" if public_addresses.empty?
 
-        response = fetch_once(uri, public_addresses.sample.to_s, method, options, &block)
-
-        case response
-        when ::Net::HTTPRedirection then
-          url = response['location']
-          # Handle relative redirects
-          url = "#{uri.scheme}://#{hostname}:#{uri.port}#{url}" if url.start_with?('/')
-        else
-          return response
-        end
+        response, url = fetch_once(uri, public_addresses.sample.to_s, method, options, &block)
+        return response if url.nil?
       end
 
       raise TooManyRedirects, "Got #{max_redirects} redirects fetching #{original_url}"
@@ -186,14 +178,27 @@ class SsrfFilter
 
     request.body = options[:body] if options[:body]
 
-    block.call(request) if block_given?
+    options[:request_proc].call(request) if options[:request_proc].respond_to?(:call)
     validate_request(request)
 
     http_options = options[:http_options] || {}
     http_options[:use_ssl] = (uri.scheme == 'https')
 
-    ::Net::HTTP.start(uri.hostname, uri.port, http_options) do |http|
-      make_request(http, request, hostname, options[:chunked])
+    with_forced_hostname(hostname) do
+      ::Net::HTTP.start(uri.hostname, uri.port, http_options) do |http|
+        http.request(request) do |response|
+          case response
+          when ::Net::HTTPRedirection then
+            url = response['location']
+            # Handle relative redirects
+            url = "#{uri.scheme}://#{hostname}:#{uri.port}#{url}" if url.start_with?('/')
+            return nil, url
+          else
+            block.call(response) unless block.nil?
+            return response, nil
+          end
+        end
+      end
     end
   end
   private_class_method :fetch_once
@@ -218,21 +223,4 @@ class SsrfFilter
     ::Thread.current[FIBER_LOCAL_KEY] = nil
   end
   private_class_method :with_forced_hostname
-
-  def self.make_request(http, request, hostname, chunked)
-    if chunked
-      Enumerator.new do |yielder|
-        with_forced_hostname(hostname) do
-          http.request(request) do |response|
-            response.read_body { |chunk| yielder << chunk }
-          end
-        end
-      end
-    else
-      with_forced_hostname(hostname) do
-        http.request(request)
-      end
-    end
-  end
-  private_class_method :make_request
 end
