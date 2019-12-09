@@ -146,7 +146,7 @@ describe SsrfFilter do
   context 'with_forced_hostname' do
     it 'should set the value for the block and clear it afterwards' do
       expect(Thread.current[SsrfFilter::FIBER_LOCAL_KEY]).to be_nil
-      SsrfFilter.with_forced_hostname('test') do
+      SsrfFilter.with_forced_hostname('test', true) do
         expect(Thread.current[SsrfFilter::FIBER_LOCAL_KEY]).to eq('test')
       end
       expect(Thread.current[SsrfFilter::FIBER_LOCAL_KEY]).to be_nil
@@ -155,7 +155,7 @@ describe SsrfFilter do
     it 'should clear the value even if an exception is raised' do
       expect(Thread.current[SsrfFilter::FIBER_LOCAL_KEY]).to be_nil
       expect do
-        SsrfFilter.with_forced_hostname('test') do
+        SsrfFilter.with_forced_hostname('test', true) do
           expect(Thread.current[SsrfFilter::FIBER_LOCAL_KEY]).to eq('test')
           raise StandardError
         end

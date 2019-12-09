@@ -184,7 +184,7 @@ class SsrfFilter
     http_options = options[:http_options] || {}
     http_options[:use_ssl] = (uri.scheme == 'https')
 
-    with_forced_hostname(hostname) do
+    with_forced_hostname(hostname, true) do
       ::Net::HTTP.start(uri.hostname, uri.port, http_options) do |http|
         http.request(request) do |response|
           case response
@@ -194,7 +194,9 @@ class SsrfFilter
             url = "#{uri.scheme}://#{hostname}:#{uri.port}#{url}" if url.start_with?('/')
             return nil, url
           else
-            block.call(response) unless block.nil?
+            unless block.nil?
+              with_forced_hostname(hostname, false) { block.call(response) }
+            end
             return response, nil
           end
         end
@@ -216,11 +218,11 @@ class SsrfFilter
   end
   private_class_method :validate_request
 
-  def self.with_forced_hostname(hostname, &_block)
-    ::Thread.current[FIBER_LOCAL_KEY] = hostname
+  def self.with_forced_hostname(hostname, force, &_block)
+    ::Thread.current[FIBER_LOCAL_KEY] = force ? hostname : nil
     yield
   ensure
-    ::Thread.current[FIBER_LOCAL_KEY] = nil
+    ::Thread.current[FIBER_LOCAL_KEY] = force ? nil : hostname
   end
   private_class_method :with_forced_hostname
 end
