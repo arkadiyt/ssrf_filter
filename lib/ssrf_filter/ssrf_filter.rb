@@ -194,9 +194,7 @@ class SsrfFilter
             url = "#{uri.scheme}://#{hostname}:#{uri.port}#{url}" if url.start_with?('/')
             return nil, url
           else
-            unless block.nil?
-              with_forced_hostname(hostname, false) { block.call(response) }
-            end
+            with_forced_hostname(hostname, false) { block.call(response) } if block.present?
             response.read_body
             return response, nil
           end
