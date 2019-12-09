@@ -197,6 +197,7 @@ class SsrfFilter
             unless block.nil?
               with_forced_hostname(hostname, false) { block.call(response) }
             end
+            response.read_body
             return response, nil
           end
         end
