@@ -233,6 +233,7 @@ describe SsrfFilter do
         res.status = 200
         res['X-Subject'] = certificate.subject
         res['X-Host'] = req['host']
+        res.body = 'response body'
       end
 
       server
@@ -273,6 +274,7 @@ describe SsrfFilter do
           queue.pop
           response = SsrfFilter.get("https://#{hostname}:#{port}", resolver: proc { [IPAddr.new('127.0.0.1')] })
           expect(response.code).to eq('200')
+          expect(response.body).to eq('response body')
           expect(response['X-Subject']).to eq("/CN=#{hostname}")
           expect(response['X-Host']).to eq("#{hostname}:#{port}")
         end
