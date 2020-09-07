@@ -194,7 +194,13 @@ class SsrfFilter
 
     with_forced_hostname(hostname) do
       ::Net::HTTP.start(uri.hostname, uri.port, http_options) do |http|
-        http.request(request)
+        if options.key?(:stream)
+          http.request(request) do |response|
+            stream.call(response) unless response.is_a?(Net::HTTPRedirection)
+          end
+        else
+          http.request(request)
+        end
       end
     end
   end
