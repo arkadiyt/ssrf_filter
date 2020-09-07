@@ -196,7 +196,7 @@ class SsrfFilter
       ::Net::HTTP.start(uri.hostname, uri.port, http_options) do |http|
         if options.key?(:stream)
           http.request(request) do |response|
-            stream.call(response) unless response.is_a?(Net::HTTPRedirection)
+            options[:stream].call(response) unless response.is_a?(Net::HTTPRedirection)
           end
         else
           http.request(request)
