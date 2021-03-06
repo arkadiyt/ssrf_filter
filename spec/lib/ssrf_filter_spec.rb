@@ -172,7 +172,7 @@ describe SsrfFilter do
     it 'should disallow header values with newlines and carriage returns' do
       # Starting in ruby 2.5, assigning a header value with newlines throws an ArgumentError
       major, minor = RUBY_VERSION.scan(/\A(\d+)\.(\d+)\.\d+\Z/).first.map(&:to_i)
-      exception = major >= 2 && minor >= 5 ? ArgumentError : SsrfFilter::CRLFInjection
+      exception = major >= 3 || (major >= 2 && minor >= 5) ? ArgumentError : SsrfFilter::CRLFInjection
 
       expect do
         SsrfFilter.get("https://#{public_ipv4}", headers: {'name' => "val\nue"})
@@ -419,7 +419,7 @@ describe SsrfFilter do
     it 'should follow redirects and succeed on a public hostname' do
       stub_request(:post, "https://#{public_ipv4}/path?key=value").with(headers: {host: 'www.example.com'})
         .to_return(status: 301, headers: {location: 'https://www.example2.com/path2?key2=value2'})
-      stub_request(:post, "https://#{public_ipv6}/path2?key2=value2")
+      stub_request(:post, "https://[#{public_ipv6}]/path2?key2=value2")
         .with(headers: {host: 'www.example2.com'}).to_return(status: 200, body: 'response body')
       resolver = proc do |hostname|
         [{
