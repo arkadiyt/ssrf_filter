@@ -140,6 +140,10 @@ class SsrfFilter
     end
   end
 
+  def self.open_uri(name, *rest, &block)
+    ::SsrfFilter::OpenURI.open_uri(name, *rest, &block)
+  end
+
   def self.unsafe_ip_address?(ip_address)
     return true if ipaddr_has_mask?(ip_address)
 
