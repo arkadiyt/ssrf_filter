@@ -447,4 +447,11 @@ describe SsrfFilter do
       expect(response.body).to eq('response body')
     end
   end
+
+  context 'open_uri' do
+    it 'invokes SsrfFilter::OpenURI#open_uri' do
+      expect(SsrfFilter::OpenURI).to receive(:open_uri).with('https://www.example.com', 'Accept' => 'application/json')
+      SsrfFilter.open_uri('https://www.example.com', 'Accept' => 'application/json')
+    end
+  end
 end
