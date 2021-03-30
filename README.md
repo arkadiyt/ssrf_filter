@@ -55,6 +55,7 @@ Options hash:
 - `:scheme_whitelist` — an array of schemes to allow. Defaults to `%w[http https]`.
 - `:resolver` — a proc that receives a hostname string and returns an array of [IPAddr](https://ruby-doc.org/stdlib-2.4.1/libdoc/ipaddr/rdoc/IPAddr.html) objects. Defaults to resolving with Ruby's [Resolv](https://ruby-doc.org/stdlib-2.4.1/libdoc/resolv/rdoc/Resolv.html). See examples below for a custom resolver.
 - `:max_redirects` — Maximum number of redirects to follow. Defaults to 10.
+- `:proxy` — An explicit HTTP proxy address. Defaults to `ENV['HTTP_PROXY']`.
 - `:params` — Hash of params to send with the request.
 - `:headers` — Hash of headers to send with the request.
 - `:body` — Body to send with the request.

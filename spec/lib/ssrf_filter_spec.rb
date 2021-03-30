@@ -127,13 +127,20 @@ describe SsrfFilter do
     end
 
     it 'should not use tls for http urls' do
-      expect(::Net::HTTP).to receive(:start).with(public_ipv4.to_s, 80, use_ssl: false)
+      expect(::Net::HTTP).to receive(:start).with(public_ipv4.to_s, 80, nil, nil, nil, nil, use_ssl: false)
       SsrfFilter.fetch_once(URI('http://www.example.com'), public_ipv4.to_s, :get, {})
     end
 
     it 'should use tls for https urls' do
-      expect(::Net::HTTP).to receive(:start).with(public_ipv4.to_s, 443, use_ssl: true)
+      expect(::Net::HTTP).to receive(:start).with(public_ipv4.to_s, 443, nil, nil, nil, nil, use_ssl: true)
       SsrfFilter.fetch_once(URI('https://www.example.com'), public_ipv4.to_s, :get, {})
+    end
+
+    it 'should set the proxy address' do
+      expect(::Net::HTTP).to receive(:start).with(public_ipv4.to_s, 80, 'localhost', 8080, 'foo', 'bar', use_ssl: false)
+      SsrfFilter.fetch_once(
+        URI('http://www.example.com'), public_ipv4.to_s, :get, proxy: 'http://foo:bar@localhost:8080'
+      )
     end
   end
 

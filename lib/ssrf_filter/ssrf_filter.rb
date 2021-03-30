@@ -168,6 +168,7 @@ class SsrfFilter
   end
   private_class_method :host_header
 
+  # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
   def self.fetch_once(uri, ip, verb, options, &block)
     if options[:params]
       params = uri.query ? ::Hash[::URI.decode_www_form(uri.query)] : {}
@@ -193,13 +194,24 @@ class SsrfFilter
     http_options = options[:http_options] || {}
     http_options[:use_ssl] = (uri.scheme == 'https')
 
+    p_addr, p_port, p_user, p_pass = nil
+
+    if options[:proxy] || ENV['HTTP_PROXY']
+      proxy_uri = URI(options[:proxy] || ENV['HTTP_PROXY'])
+      p_addr = proxy_uri.hostname
+      p_port = proxy_uri.port
+      p_user = proxy_uri.user
+      p_pass = proxy_uri.password
+    end
+
     with_forced_hostname(hostname) do
-      ::Net::HTTP.start(uri.hostname, uri.port, http_options) do |http|
+      ::Net::HTTP.start(uri.hostname, uri.port, p_addr, p_port, p_user, p_pass, http_options) do |http|
         http.request(request)
       end
     end
   end
   private_class_method :fetch_once
+  # rubocop:enable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
 
   def self.validate_request(request)
     # RFC822 allows multiline "folded" headers:
