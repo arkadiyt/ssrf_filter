@@ -77,7 +77,8 @@ class SsrfFilter
     put: ::Net::HTTP::Put,
     post: ::Net::HTTP::Post,
     delete: ::Net::HTTP::Delete,
-    head: ::Net::HTTP::Head
+    head: ::Net::HTTP::Head,
+    patch: ::Net::HTTP::Patch,
   }.freeze
 
   FIBER_LOCAL_KEY = :__ssrf_filter_hostname
@@ -100,7 +101,7 @@ class SsrfFilter
   class CRLFInjection < Error
   end
 
-  %i[get put post delete head].each do |method|
+  %i[get put post delete head patch].each do |method|
     define_singleton_method(method) do |url, options = {}, &block|
       ::SsrfFilter::Patch::SSLSocket.apply!
       ::SsrfFilter::Patch::HTTPGenericRequest.apply!
