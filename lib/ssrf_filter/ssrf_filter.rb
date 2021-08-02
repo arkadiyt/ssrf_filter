@@ -78,7 +78,7 @@ class SsrfFilter
     post: ::Net::HTTP::Post,
     delete: ::Net::HTTP::Delete,
     head: ::Net::HTTP::Head,
-    patch: ::Net::HTTP::Patch,
+    patch: ::Net::HTTP::Patch
   }.freeze
 
   FIBER_LOCAL_KEY = :__ssrf_filter_hostname
