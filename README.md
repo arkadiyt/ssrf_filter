@@ -42,7 +42,7 @@ response.body
 
 ### API reference
 
-`SsrfFilter.get/.put/.post/.delete/.head(url, options = {}, &block)`
+`SsrfFilter.get/.put/.post/.delete/.head/.patch(url, options = {}, &block)`
 
 Fetches the requested url using a get/put/post/delete/head request, respectively.
 
