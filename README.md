@@ -44,7 +44,7 @@ response.body
 
 `SsrfFilter.get/.put/.post/.delete/.head/.patch(url, options = {}, &block)`
 
-Fetches the requested url using a get/put/post/delete/head request, respectively.
+Fetches the requested url using a get/put/post/delete/head/patch request, respectively.
 
 Params:
 - `url` — the url to fetch.
