@@ -104,7 +104,7 @@ describe SsrfFilter do
 
     it 'should be able to make a patch request' do
       stub_request(:patch, "https://#{public_ipv4}").to_return(status: 200, body: 'response body')
-      response = SsrfFilter.fetch_once(URI('https://www.example.com'), public_ipv4.to_s, :put, {})
+      response = SsrfFilter.fetch_once(URI('https://www.example.com'), public_ipv4.to_s, :patch, {})
       expect(response.code).to eq('200')
       expect(response.body).to eq('response body')
     end
