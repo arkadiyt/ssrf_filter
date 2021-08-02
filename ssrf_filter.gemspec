@@ -19,7 +19,7 @@ Gem::Specification.new do |gem|
 
   gem.add_development_dependency('bundler-audit', '~> 0.6.1')
   gem.add_development_dependency('coveralls', '~> 0.8.22')
-  gem.add_development_dependency('psych', '>= 2')
+  gem.add_development_dependency('psych', '>= 2', '< 4')
   gem.add_development_dependency('rspec', '~> 3.8.0')
   gem.add_development_dependency('webmock', '>= 3.5.1')
   gem.add_development_dependency('webrick') if major >= 3
