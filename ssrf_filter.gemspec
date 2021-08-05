@@ -32,7 +32,7 @@ Gem::Specification.new do |gem|
     # ssrf_filter doesn't use public_suffix directly, it's required by `addressable` which is required
     # by `webmock`. We need to set this requirement here to pin a version that is compatible with ruby 2.0
     gem.add_development_dependency('public_suffix', '2.0.5')
-    gem.add_development_dependency('rexml' '3.2.4')
+    gem.add_development_dependency('rexml', '3.2.4')
     gem.add_development_dependency('rubocop', '~> 0.50.0')
   end
 end
