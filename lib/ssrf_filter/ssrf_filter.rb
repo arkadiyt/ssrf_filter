@@ -150,7 +150,6 @@ class SsrfFilter
 
     true
   end
-  private_class_method :unsafe_ip_address?
 
   def self.ipaddr_has_mask?(ipaddr)
     range = ipaddr.to_range
