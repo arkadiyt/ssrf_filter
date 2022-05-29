@@ -1,0 +1,37 @@
+name: Build-test
+
+on:
+  push:
+  workflow_call:
+
+jobs:
+  build-test:
+    strategy:
+      matrix:
+        ruby-version: [2.6.0, 2.7.0, 3.0.0, 3.1.0]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ matrix.ruby-version }}
+        bundler-cache: true
+    - name: Test
+      run: make -f Makefile.docker test
+    - name: Coveralls
+      uses: coverallsapp/github-action@master
+      with:
+        parallel: true
+        flag-name: ${{ matrix.ruby-version }}
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Lint
+      run: make -f Makefile.docker lint
+  finish:
+    needs: build-test
+    runs-on: ubuntu-latest
+    steps:
+    - name: Coveralls Finished
+      uses: coverallsapp/github-action@master
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        parallel-finished: true
