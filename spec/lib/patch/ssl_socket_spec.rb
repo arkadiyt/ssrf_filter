@@ -1,13 +1,15 @@
 # frozen_string_literal: true
 
 describe ::SsrfFilter::Patch::SSLSocket do
-  before :each do
-    subject.remove_instance_variable(:@patched_ssl_socket) if subject.instance_variable_defined?(:@patched_ssl_socket)
+  before do
+    if described_class.instance_variable_defined?(:@patched_ssl_socket)
+      described_class.remove_instance_variable(:@patched_ssl_socket)
+    end
   end
 
-  it 'should only patch once' do
+  it 'only patches once' do
     expect(::OpenSSL::SSL::SSLSocket).to receive(:class_eval).once.and_call_original
-    subject.apply!
-    subject.apply!
+    described_class.apply!
+    described_class.apply!
   end
 end
