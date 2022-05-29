@@ -170,9 +170,9 @@ describe SsrfFilter do
     end
 
     it 'should disallow header values with newlines and carriage returns' do
-      # Starting in ruby 2.5, assigning a header value with newlines throws an ArgumentError
+      # In more recent versions of ruby, assigning a header value with newlines throws an ArgumentError
       major, minor = RUBY_VERSION.scan(/\A(\d+)\.(\d+)\.\d+\Z/).first.map(&:to_i)
-      exception = major >= 3 || (major >= 2 && minor >= 5) ? ArgumentError : SsrfFilter::CRLFInjection
+      exception = major >= 3 || (major >= 2 && minor >= 3) ? ArgumentError : SsrfFilter::CRLFInjection
 
       expect do
         SsrfFilter.get("https://#{public_ipv4}", headers: {'name' => "val\nue"})
@@ -203,7 +203,7 @@ describe SsrfFilter do
       certificate.subject = subject
       certificate.issuer = subject
       certificate.not_before = Time.now
-      certificate.not_after = Time.now + 60 * 60 * 24
+      certificate.not_after = Time.now + (60 * 60 * 24)
       certificate.public_key = public_key
       certificate.serial = 0x0
       certificate.version = 2
@@ -240,7 +240,6 @@ describe SsrfFilter do
 
       expect(::Net::HTTP).to receive(:start).exactly(certificates.length).times
         .and_wrap_original do |orig, *args, &block|
-
         args.last[:cert_store] = store # Inject our custom trust store
         orig.call(*args, &block)
       end

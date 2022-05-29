@@ -1,0 +1,10 @@
+rubocop:
+	bundle exec rubocop
+
+audit:
+	bundle exec bundler-audit
+
+lint: rubocop audit
+
+rspec:
+	bundle exec rspec

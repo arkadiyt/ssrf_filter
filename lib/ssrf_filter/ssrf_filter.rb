@@ -129,7 +129,7 @@ class SsrfFilter
         response = fetch_once(uri, public_addresses.sample.to_s, method, options, &block)
 
         case response
-        when ::Net::HTTPRedirection then
+        when ::Net::HTTPRedirection
           url = response['location']
           # Handle relative redirects
           url = "#{uri.scheme}://#{hostname}:#{uri.port}#{url}" if url.start_with?('/')

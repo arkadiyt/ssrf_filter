@@ -1,6 +1,9 @@
 inherit_from:
   - .rubocop_todo.yml
 
+Gemspec/RequiredRubyVersion:
+  Enabled: false
+
 Metrics/AbcSize:
   Enabled: false
 
@@ -19,11 +22,14 @@ Metrics/MethodLength:
 Naming/UncommunicativeMethodParamName:
   Enabled: false
 
+Layout/CaseIndentation:
+  EnforcedStyle: end
+
+Layout/EndAlignment:
+  EnforcedStyleAlignWith: variable
+
 Layout/SpaceInsideHashLiteralBraces:
   EnforcedStyle: no_space
-
-Gemspec/RequiredRubyVersion:
-  Enabled: false
 
 Layout/MultilineMethodCallIndentation:
   EnforcedStyle: indented

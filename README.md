@@ -19,7 +19,7 @@ This gem provides a safe and easy way to fetch content from user-submitted urls.
 - handles URIs/IPv4/IPv6, redirects, DNS, etc, correctly
 - has 0 runtime dependencies
 - has a comprehensive test suite (100% code coverage)
-- is tested against ruby `2.0`, `2.1`, `2.2`, `2.3`, `2.4`, `2.5`, `2.6`, `2.7`, `3.0`, and `ruby-head`
+- is tested against ruby `2.0`, `2.1`, `2.2`, `2.3`, `2.4`, `2.5`, `2.6`, `2.7`, `3.0`, `3.1`, and `ruby-head`
 
 ### Quick start
 
