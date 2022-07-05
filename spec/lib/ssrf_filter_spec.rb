@@ -107,7 +107,13 @@ describe SsrfFilter do
         {host: 'www.example.com', header: 'value', header2: 'value2'}).to_return(status: 200, body: 'response body')
       options = {
         headers: {'header' => 'value'},
-        params: {'key' => 'value'}
+        params: {'key' => 'value'},
+        proxy: {
+          p_addr: '127.0.0.1',
+          p_port: '12345',
+          p_user: 'guest',
+          p_pass: 'password',
+        },
       }
       uri = URI('https://www.example.com/?key=value')
       response = SsrfFilter.fetch_once(uri, public_ipv4.to_s, :get, options) do |req|
