@@ -112,8 +112,8 @@ describe SsrfFilter do
           p_addr: '127.0.0.1',
           p_port: '12345',
           p_user: 'guest',
-          p_pass: 'password',
-        },
+          p_pass: 'password'
+        }
       }
       uri = URI('https://www.example.com/?key=value')
       response = SsrfFilter.fetch_once(uri, public_ipv4.to_s, :get, options) do |req|
