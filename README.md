@@ -58,6 +58,7 @@ Options hash:
 - `:params` — Hash of params to send with the request.
 - `:headers` — Hash of headers to send with the request.
 - `:body` — Body to send with the request.
+- `:proxy` — Optional proxy parameters `:p_addr`, `:p_port`, `:p_user`, `:p_pass` same as you'd pass to [Net::HTTP.start](https://ruby-doc.org/stdlib-2.6.4/libdoc/net/http/rdoc/Net/HTTP.html#method-c-start) for routing requests through a proxy.
 - `:http_options` – Options to pass to [Net::HTTP.start](https://ruby-doc.org/stdlib-2.6.4/libdoc/net/http/rdoc/Net/HTTP.html#method-c-start). Use this to set custom timeouts or SSL options.
 
 Returns:

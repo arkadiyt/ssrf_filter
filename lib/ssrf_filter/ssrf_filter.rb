@@ -191,11 +191,21 @@ class SsrfFilter
     block.call(request) if block_given?
     validate_request(request)
 
+    proxy = options[:proxy] || {}
+
     http_options = options[:http_options] || {}
     http_options[:use_ssl] = (uri.scheme == 'https')
 
     with_forced_hostname(hostname) do
-      ::Net::HTTP.start(uri.hostname, uri.port, http_options) do |http|
+      ::Net::HTTP.start(
+        uri.hostname,
+        uri.port,
+        proxy[:p_addr],
+        proxy[:p_port],
+        proxy[:p_user],
+        proxy[:p_pass],
+        http_options,
+      ) do |http|
         http.request(request)
       end
     end
