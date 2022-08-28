@@ -19,10 +19,16 @@ Metrics/BlockLength:
 Metrics/ClassLength:
   Enabled: false
 
+Metrics/CyclomaticComplexity:
+  Enabled: false
+
 Metrics/MethodLength:
   Enabled: false
 
 Naming/MethodParameterName:
+  Enabled: false
+
+Metrics/PerceivedComplexity:
   Enabled: false
 
 Layout/CaseIndentation:

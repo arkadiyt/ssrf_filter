@@ -19,11 +19,11 @@ require 'ssrf_filter'
 
 def allow_net_connections_for_context(context)
   context.before :all do
-    WebMock.allow_net_connect!
+    WebMock.disable!
   end
 
   context.after :all do
-    WebMock.disable_net_connect!
+    WebMock.enable!
   end
 end
 
