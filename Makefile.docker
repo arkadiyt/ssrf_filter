@@ -1,0 +1,15 @@
+lint:
+	bundle exec rubocop
+	bundle exec bundler-audit
+
+test:
+	bundle exec rspec
+
+bash:
+	bash
+
+bundle:
+	bundle install
+
+console:
+	irb -r 'bundler/setup' -r 'ssrf_filter'

@@ -1,0 +1,4 @@
+.git/
+vendor/
+coverage
+Gemfile.lock

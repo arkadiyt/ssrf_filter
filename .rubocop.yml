@@ -1,6 +1,15 @@
 inherit_from:
   - .rubocop_todo.yml
 
+require:
+  - rubocop-rspec
+
+AllCops:
+  NewCops: enable
+
+Gemspec/RequiredRubyVersion:
+  Enabled: false
+
 Metrics/AbcSize:
   Enabled: false
 
@@ -10,26 +19,53 @@ Metrics/BlockLength:
 Metrics/ClassLength:
   Enabled: false
 
-Metrics/LineLength:
-  Max: 120
-
 Metrics/MethodLength:
   Enabled: false
 
-Naming/UncommunicativeMethodParamName:
+Naming/MethodParameterName:
   Enabled: false
+
+Layout/CaseIndentation:
+  EnforcedStyle: end
+
+Layout/EndAlignment:
+  EnforcedStyleAlignWith: variable
+
+Layout/FirstArrayElementIndentation:
+  EnforcedStyle: consistent
+
+Layout/LineLength:
+  Max: 120
+
+Layout/MultilineMethodCallIndentation:
+  EnforcedStyle: indented
 
 Layout/SpaceInsideHashLiteralBraces:
   EnforcedStyle: no_space
 
-Gemspec/RequiredRubyVersion:
+RSpec/BeforeAfterAll:
   Enabled: false
 
-Layout/MultilineMethodCallIndentation:
-  EnforcedStyle: indented
+RSpec/MultipleExpectations:
+  Enabled: false
+
+RSpec/ExampleLength:
+  Max: 40
+
+RSpec/FilePath:
+  SpecSuffixOnly: true
+
+RSpec/MessageSpies:
+  EnforcedStyle: receive
+
+RSpec/StubbedMock:
+  Enabled: False
 
 Style/Documentation:
   Enabled: false
 
 Style/NumericLiterals:
+  Enabled: false
+
+Style/WhileUntilModifier:
   Enabled: false
