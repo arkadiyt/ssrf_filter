@@ -1,3 +1,6 @@
+### 1.1.0 (8/28/2022)
+* Add support for chunked responses ([mrhaddad](https://github.com/arkadiyt/ssrf_filter/pull/30))
+
 ### 1.0.8 (8/3/2022)
 * Add support for HEAD requests ([jakeyheath](https://github.com/arkadiyt/ssrf_filter/pull/38))
 
