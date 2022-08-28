@@ -194,10 +194,10 @@ describe SsrfFilter do
 
     allow_net_connections_for_context(self)
 
-    def make_keypair(subject)
+    def make_keypair(hostname)
       private_key = OpenSSL::PKey::RSA.new(2048)
       public_key = private_key.public_key
-      subject = OpenSSL::X509::Name.parse(subject)
+      subject = OpenSSL::X509::Name.parse("/CN=#{hostname}")
 
       certificate = OpenSSL::X509::Certificate.new
       certificate.subject = subject
@@ -207,6 +207,9 @@ describe SsrfFilter do
       certificate.public_key = public_key
       certificate.serial = 0x0
       certificate.version = 2
+      certificate.extensions = [
+        OpenSSL::X509::ExtensionFactory.new.create_extension('subjectAltName', "DNS:#{hostname}")
+      ]
 
       certificate.sign(private_key, OpenSSL::Digest.new('SHA256'))
 
@@ -248,7 +251,7 @@ describe SsrfFilter do
     it 'validates TLS certificates' do
       hostname = 'ssrf-filter.example.com'
       port = 8443
-      private_key, certificate = make_keypair("CN=#{hostname}")
+      private_key, certificate = make_keypair(hostname)
       stub_const('SsrfFilter::IPV4_BLACKLIST', [])
 
       inject_custom_trust_store(certificate)
@@ -278,8 +281,8 @@ describe SsrfFilter do
       require 'webrick/https'
 
       port = 8443
-      private_key, certificate = make_keypair('CN=localhost')
-      virtualhost_private_key, virtualhost_certificate = make_keypair('CN=virtualhost')
+      private_key, certificate = make_keypair('localhost')
+      virtualhost_private_key, virtualhost_certificate = make_keypair('virtualhost')
       stub_const('SsrfFilter::IPV4_BLACKLIST', [])
 
       inject_custom_trust_store(certificate, virtualhost_certificate)
