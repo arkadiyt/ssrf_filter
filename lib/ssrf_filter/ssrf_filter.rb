@@ -6,6 +6,10 @@ require 'resolv'
 require 'uri'
 
 class SsrfFilter
+  def self.test
+    puts 'test'
+  end
+
   def self.prefixlen_from_ipaddr(ipaddr)
     mask_addr = ipaddr.instance_variable_get('@mask_addr')
     raise ArgumentError, 'Invalid mask' if mask_addr.zero?
