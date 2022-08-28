@@ -10,7 +10,9 @@ class SsrfFilter
     mask_addr = ipaddr.instance_variable_get('@mask_addr')
     raise ArgumentError, 'Invalid mask' if mask_addr.zero?
 
-    mask_addr >>= 1 while (mask_addr & 0x1).zero?
+    while (mask_addr & 0x1).zero?
+      mask_addr >>= 1
+    end
 
     length = 0
     while mask_addr & 0x1 == 0x1
@@ -104,7 +106,6 @@ class SsrfFilter
   %i[get put post delete head patch].each do |method|
     define_singleton_method(method) do |url, options = {}, &block|
       ::SsrfFilter::Patch::SSLSocket.apply!
-      ::SsrfFilter::Patch::HTTPGenericRequest.apply!
 
       original_url = url
       scheme_whitelist = options[:scheme_whitelist] || DEFAULT_SCHEME_WHITELIST
@@ -129,7 +130,7 @@ class SsrfFilter
         response = fetch_once(uri, public_addresses.sample.to_s, method, options, &block)
 
         case response
-        when ::Net::HTTPRedirection then
+        when ::Net::HTTPRedirection
           url = response['location']
           # Handle relative redirects
           url = "#{uri.scheme}://#{hostname}:#{uri.port}#{url}" if url.start_with?('/')
@@ -171,7 +172,7 @@ class SsrfFilter
 
   def self.fetch_once(uri, ip, verb, options, &block)
     if options[:params]
-      params = uri.query ? ::Hash[::URI.decode_www_form(uri.query)] : {}
+      params = uri.query ? ::URI.decode_www_form(uri.query).to_h : {}
       params.merge!(options[:params])
       uri.query = ::URI.encode_www_form(params)
     end
@@ -195,7 +196,7 @@ class SsrfFilter
     http_options[:use_ssl] = (uri.scheme == 'https')
 
     with_forced_hostname(hostname) do
-      ::Net::HTTP.start(uri.hostname, uri.port, http_options) do |http|
+      ::Net::HTTP.start(uri.hostname, uri.port, **http_options) do |http|
         http.request(request)
       end
     end

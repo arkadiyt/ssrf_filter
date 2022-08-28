@@ -1,10 +1,19 @@
 # frozen_string_literal: true
 
-require 'coveralls'
 require 'simplecov'
-SimpleCov.add_filter('spec')
-Coveralls.wear!
-ENV['COVERALLS_NOISY'] = '1'
+require 'simplecov-lcov'
+SimpleCov.start do
+  SimpleCov::Formatter::LcovFormatter.config do |c|
+    c.report_with_single_file = true
+    c.single_report_path = 'coverage/lcov.info'
+  end
+
+  SimpleCov.formatters = SimpleCov::Formatter::MultiFormatter.new([
+    SimpleCov::Formatter::HTMLFormatter,
+    SimpleCov::Formatter::LcovFormatter
+  ])
+  add_filter %w[spec]
+end
 require 'webmock/rspec'
 require 'ssrf_filter'
 

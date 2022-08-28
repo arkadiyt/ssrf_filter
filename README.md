@@ -1,4 +1,4 @@
-# ssrf_filter [![Gem](https://img.shields.io/gem/v/ssrf_filter.svg)](https://rubygems.org/gems/ssrf_filter) [![TravisCI](https://travis-ci.com/arkadiyt/ssrf_filter.svg?branch=master)](https://travis-ci.com/arkadiyt/ssrf_filter/) [![Coverage Status](https://coveralls.io/repos/github/arkadiyt/ssrf_filter/badge.svg?branch=master)](https://coveralls.io/github/arkadiyt/ssrf_filter?branch=master) [![License](https://img.shields.io/github/license/arkadiyt/ssrf_filter.svg)](https://github.com/arkadiyt/ssrf_filter/blob/master/LICENSE.md)
+# ssrf_filter [![Gem](https://img.shields.io/gem/v/ssrf_filter.svg)](https://rubygems.org/gems/ssrf_filter) [![Tests](https://github.com/arkadiyt/ssrf_filter/actions/workflows/build-test.yml/badge.svg)](https://github.com/arkadiyt/ssrf_filter/actions/workflows/build-test.yml/badge.svg) [![Coverage Status](https://coveralls.io/repos/github/arkadiyt/ssrf_filter/badge.svg?branch=main)](https://coveralls.io/github/arkadiyt/ssrf_filter?branch=main) [![License](https://img.shields.io/github/license/arkadiyt/ssrf_filter.svg)](https://github.com/arkadiyt/ssrf_filter/blob/master/LICENSE.md)
 
 ## Table of Contents
 - [What's it for](https://github.com/arkadiyt/ssrf_filter#whats-it-for)
@@ -19,14 +19,14 @@ This gem provides a safe and easy way to fetch content from user-submitted urls.
 - handles URIs/IPv4/IPv6, redirects, DNS, etc, correctly
 - has 0 runtime dependencies
 - has a comprehensive test suite (100% code coverage)
-- is tested against ruby `2.0`, `2.1`, `2.2`, `2.3`, `2.4`, `2.5`, `2.6`, `2.7`, `3.0`, and `ruby-head`
+- is tested against ruby `2.6`, `2.7`, `3.0`, and `3.1`
 
 ### Quick start
 
 1) Add the gem to your Gemfile:
 
 ```ruby
-gem 'ssrf_filter', '~> 1.0'
+gem 'ssrf_filter', '~> 1.8'
 ```
 
 2) In your code:

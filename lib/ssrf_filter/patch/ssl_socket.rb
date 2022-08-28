@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class SsrfFilter
   module Patch
     module SSLSocket
