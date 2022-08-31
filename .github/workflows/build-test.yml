@@ -1,6 +1,6 @@
 name: Build-test
 
-on: 
+on:
   push:
   workflow_call:
 
@@ -8,7 +8,7 @@ jobs:
   build-test:
     strategy:
       matrix:
-        ruby-version: [2.6.0, 2.7.0, 3.0.0, 3.1.0]
+        ruby-version: [2.6.0, 2.7.0, 3.0.0, 3.1.0, head]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2

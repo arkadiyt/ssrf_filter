@@ -35,13 +35,14 @@ class SsrfFilter
         ::OpenSSL::SSL::SSLSocket.class_eval do
           original_post_connection_check = instance_method(:post_connection_check)
           define_method(:post_connection_check) do |hostname|
-            original_post_connection_check.bind(self).call(::Thread.current[::SsrfFilter::FIBER_LOCAL_KEY] || hostname)
+            original_post_connection_check.bind(self).call(::Thread.current[::SsrfFilter::FIBER_HOSTNAME_KEY] ||
+              hostname)
           end
 
           if method_defined?(:hostname=)
             original_hostname = instance_method(:hostname=)
             define_method(:hostname=) do |hostname|
-              original_hostname.bind(self).call(::Thread.current[::SsrfFilter::FIBER_LOCAL_KEY] || hostname)
+              original_hostname.bind(self).call(::Thread.current[::SsrfFilter::FIBER_HOSTNAME_KEY] || hostname)
             end
           end
         end
