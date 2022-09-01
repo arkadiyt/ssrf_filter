@@ -1,3 +1,6 @@
+### 1.1.1 (8/31/2022)
+* Fix network connection errors if you were making https requests while using [net-http](https://github.com/ruby/net-http) 2.2 or higher ([arkadiyt](https://github.com/arkadiyt/ssrf_filter/pull/54))
+
 ### 1.1.0 (8/28/2022)
 * Add support for chunked responses ([mrhaddad](https://github.com/arkadiyt/ssrf_filter/pull/30))
 
