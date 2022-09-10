@@ -170,6 +170,7 @@ class SsrfFilter
       params.merge!(options[:params])
       uri.query = ::URI.encode_www_form(params)
     end
+    options[:request_proc] = block if block
 
     hostname = uri.hostname
     uri.hostname = ip
@@ -199,7 +200,7 @@ class SsrfFilter
             url = "#{uri.scheme}://#{hostname}:#{uri.port}#{url}" if url.start_with?('/')
             return nil, url
           else
-            block&.call(response)
+            options[:response_proc].call(response) if options[:response_proc].respond_to?(:call)
             return response, nil
           end
         end

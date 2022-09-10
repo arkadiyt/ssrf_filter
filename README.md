@@ -60,6 +60,7 @@ Options hash:
 - `:body` — Body to send with the request.
 - `:http_options` – Options to pass to [Net::HTTP.start](https://ruby-doc.org/stdlib-2.6.4/libdoc/net/http/rdoc/Net/HTTP.html#method-c-start). Use this to set custom timeouts or SSL options.
 - `:request_proc` - a proc that receives the request object, for custom modifications before sending the request.
+- `:response_proc` - a proc that receives the response object, for processing the streaming responses.
 
 Returns:
 
@@ -93,13 +94,19 @@ request_proc = proc do |request|
   request.basic_auth('username', 'password')
 end
 SsrfFilter.get('https://www.example.com', resolver: resolver, request_proc: request_proc)
+# A block given directly is also treated as the request_proc
+SsrfFilter.get('https://www.example.com', resolver: resolver) do |request|
+  request['content-type'] = 'application/json'
+  request.basic_auth('username', 'password')
+end
 
 # Stream response
-SsrfFilter.get('https://www.example.com') do |response|
+response_proc = proc do |response|
   response.read_body do |chunk|
     puts chunk
   end
 end
+SsrfFilter.get('https://www.example.com', response_proc: response_proc)
 ```
 
 ### Changelog

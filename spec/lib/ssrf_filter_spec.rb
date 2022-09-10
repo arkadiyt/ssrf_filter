@@ -105,7 +105,7 @@ describe SsrfFilter do
       expect(url).to be_nil
     end
 
-    it 'passes headers, params, and blocks' do
+    it 'passes headers, params, and blocks to the request proc' do
       stub_request(:get, "https://#{public_ipv4}/?key=value").with(headers:
         {host: 'www.example.com', header: 'value', header2: 'value2'}).to_return(status: 200, body: 'response body')
       options = {
@@ -117,6 +117,22 @@ describe SsrfFilter do
       }
       uri = URI('https://www.example.com/?key=value')
       response, url = described_class.fetch_once(uri, public_ipv4.to_s, :get, options)
+      expect(response.code).to eq('200')
+      expect(response.body).to eq('response body')
+      expect(url).to be_nil
+    end
+
+    it 'treats the block given directly as the request_proc' do
+      stub_request(:get, "https://#{public_ipv4}/?key=value").with(headers:
+         {host: 'www.example.com', header: 'value', header2: 'value2'}).to_return(status: 200, body: 'response body')
+      options = {
+        headers: {'header' => 'value'},
+        params: {'key' => 'value'}
+      }
+      uri = URI('https://www.example.com/?key=value')
+      response, url = described_class.fetch_once(uri, public_ipv4.to_s, :get, options) do |req|
+        req['header2'] = 'value2'
+      end
       expect(response.code).to eq('200')
       expect(response.body).to eq('response body')
       expect(url).to be_nil
@@ -367,13 +383,14 @@ describe SsrfFilter do
 
           chunk_index = 0
           url = "https://#{hostname}:#{port}/chunked"
-          described_class.get(url, resolver: proc { [IPAddr.new('127.0.0.1')] }) do |response|
+          response_proc = proc do |response|
             expect(response.code).to eq('200')
             response.read_body do |chunk|
               expect(chunk).to eq(chunks[chunk_index])
               chunk_index += 1
             end
           end
+          described_class.get(url, resolver: proc { [IPAddr.new('127.0.0.1')] }, response_proc: response_proc)
           expect(chunk_index).to eq(chunks.length)
         end
       ensure
