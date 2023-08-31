@@ -191,6 +191,7 @@ class SsrfFilter
 
     with_forced_hostname(hostname, ip) do
       ::Net::HTTP.start(uri.hostname, uri.port, **http_options) do |http|
+        request['User-Agent'] = 'ssrf_filter/1.0'
         http.request(request) do |response|
           case response
           when ::Net::HTTPRedirection
