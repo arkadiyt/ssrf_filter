@@ -109,15 +109,14 @@ class SsrfFilter
       ::SsrfFilter::Patch::SSLSocket.apply!
 
       original_url = url
-      scheme_whitelist = options[:scheme_whitelist] || DEFAULT_SCHEME_WHITELIST
-      resolver = options[:resolver] || DEFAULT_RESOLVER
-      allow_unfollowed_redirects = options.fetch(:allow_unfollowed_redirects) { DEFAULT_ALLOW_UNFOLLOWED_REDIRECTS }
-      max_redirects = options[:max_redirects] || DEFAULT_MAX_REDIRECTS
+      scheme_whitelist = options.fetch(:scheme_whitelist, DEFAULT_SCHEME_WHITELIST)
+      resolver = options.fetch(:resolver, DEFAULT_RESOLVER)
+      allow_unfollowed_redirects = options.fetch(:allow_unfollowed_redirects, DEFAULT_ALLOW_UNFOLLOWED_REDIRECTS)
+      max_redirects = options.fetch(:max_redirects, DEFAULT_MAX_REDIRECTS)
       url = url.to_s
 
-      redirects = 0
-
-      loop do
+      response = nil
+      (max_redirects + 1).times do
         uri = URI(url)
 
         unless scheme_whitelist.include?(uri.scheme)
@@ -132,17 +131,11 @@ class SsrfFilter
         raise PrivateIPAddress, "Hostname '#{hostname}' has no public ip addresses" if public_addresses.empty?
 
         response, url = fetch_once(uri, public_addresses.sample.to_s, method, options, &block)
-
-        break response if url.nil?
-
-        if max_redirects <= redirects
-          break response if allow_unfollowed_redirects
-
-          raise TooManyRedirects, "Got #{max_redirects} redirects fetching #{original_url}"
-        end
-
-        redirects += 1
+        return response if url.nil?
       end
+
+      return response if allow_unfollowed_redirects
+      raise TooManyRedirects, "Got #{max_redirects} redirects fetching #{original_url}"
     end
   end
 
@@ -208,10 +201,10 @@ class SsrfFilter
           url = response['location']
           # Handle relative redirects
           url = "#{uri.scheme}://#{hostname}:#{uri.port}#{url}" if url.start_with?('/')
-          return response, url
         else
-          return response, nil
+          url = nil
         end
+        return response, url
       end
     end
   end
