@@ -1,3 +1,9 @@
+### 1.1.2 (9/11/2023)
+* Fix a bug introduced in 1.1.0 when reading non-streaming bodies from responses ([mshibuya](https://github.com/arkadiyt/ssrf_filter/pull/60))
+* Test against ruby 3.2 ([petergoldstein](https://github.com/arkadiyt/ssrf_filter/pull/62))
+* Fix a [bug](https://github.com/arkadiyt/ssrf_filter/issues/61) preventing DNS resolution in some cases ([arkadiyt](https://github.com/arkadiyt/ssrf_filter/pull/70))
+* Add an option to not throw an exception if you hit the maximum number of redirects ([elliterate](https://github.com/arkadiyt/ssrf_filter/pull/63))
+
 ### 1.1.1 (8/31/2022)
 * Fix network connection errors if you were making https requests while using [net-http](https://github.com/ruby/net-http) 2.2 or higher ([arkadiyt](https://github.com/arkadiyt/ssrf_filter/pull/54))
 
