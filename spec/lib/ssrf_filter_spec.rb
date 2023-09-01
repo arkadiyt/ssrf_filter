@@ -460,6 +460,21 @@ describe SsrfFilter do
       end.to raise_error(described_class::TooManyRedirects)
     end
 
+    it 'returns the last response if there are too many redirects and unfollowed redirects are allowed' do
+      stub_request(:get, "https://#{public_ipv4}").with(headers: {host: 'www.example.com'})
+        .to_return(status: 301, headers: {location: 'https://www.example2.com'})
+      resolver = proc { [public_ipv4] }
+      response =
+        described_class.get(
+          'https://www.example.com',
+          resolver: resolver,
+          allow_unfollowed_redirects: true,
+          max_redirects: 0
+        )
+      expect(response.code).to eq('301')
+      expect(response['location']).to eq('https://www.example2.com')
+    end
+
     it 'fails if the redirected url is not in the scheme whitelist' do
       stub_request(:put, "https://#{public_ipv4}").with(headers: {host: 'www.example.com'})
         .to_return(status: 301, headers: {location: 'ftp://www.example.com'})
