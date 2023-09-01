@@ -200,6 +200,11 @@ class SsrfFilter
             return nil, url
           else
             block&.call(response)
+            # Normally the body is read by net/http, e.g. here:
+            # https://github.com/ruby/ruby/blob/bead5396503175b6873d1b4e60bd8c8d2c82b772/lib/net/http/response.rb#L321
+            # but because we passed a block to http.request and are returning below, the control flow is altered and
+            # that line never executes, so read it ourselves
+            response.body
             return response, nil
           end
         end
