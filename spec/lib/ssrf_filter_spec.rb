@@ -380,6 +380,40 @@ describe SsrfFilter do
         web_server_thread&.kill
       end
     end
+
+    it 'does not break when reading the body without using a block' do
+      port = 8443
+
+      private_key, certificate = make_keypair('CN=localhost')
+      inject_custom_trust_store(certificate)
+      stub_const('SsrfFilter::IPV4_BLACKLIST', [])
+
+      begin
+        queue = Queue.new # Used as a semaphore
+
+        web_server_thread = Thread.new do
+          server = make_web_server(port, private_key, certificate) do
+            queue.push(nil)
+          end
+          server.mount('/README.md', WEBrick::HTTPServlet::FileHandler, 'README.md')
+          server.start
+        end
+
+        Timeout.timeout(2) do
+          queue.pop
+
+          options = {
+            resolver: proc { [IPAddr.new('127.0.0.1')] }
+          }
+
+          response = described_class.get("https://localhost:#{port}/README.md", options)
+          expect(response.code).to eq('200')
+          expect(response.body).to match(/ssrf_filter/)
+        end
+      ensure
+        web_server_thread&.kill
+      end
+    end
   end
 
   describe 'get/put/post/delete' do

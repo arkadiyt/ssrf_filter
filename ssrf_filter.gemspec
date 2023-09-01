@@ -18,10 +18,10 @@ Gem::Specification.new do |gem|
 
   gem.add_development_dependency('bundler-audit', '~> 0.9.1')
   gem.add_development_dependency('pry-byebug')
-  gem.add_development_dependency('rspec', '~> 3.11.0')
+  gem.add_development_dependency('rspec', '~> 3.12.0')
   gem.add_development_dependency('rubocop', '~> 1.35.0')
   gem.add_development_dependency('rubocop-rspec', '~> 2.12.1')
-  gem.add_development_dependency('simplecov', '~> 0.21.2')
+  gem.add_development_dependency('simplecov', '~> 0.22.0')
   gem.add_development_dependency('simplecov-lcov', '~> 0.8.0')
   gem.add_development_dependency('webmock', '>= 3.18.0')
   gem.add_development_dependency('webrick')
