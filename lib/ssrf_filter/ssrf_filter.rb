@@ -191,17 +191,17 @@ class SsrfFilter
 
     with_forced_hostname(hostname, ip) do
       ::Net::HTTP.start(uri.hostname, uri.port, **http_options) do |http|
-        http.request(request) do |response|
-          case response
-          when ::Net::HTTPRedirection
-            url = response['location']
-            # Handle relative redirects
-            url = "#{uri.scheme}://#{hostname}:#{uri.port}#{url}" if url.start_with?('/')
-            return nil, url
-          else
-            block&.call(response)
-            return response, nil
-          end
+        response = http.request(request) do |res|
+          block&.call(res)
+        end
+        case response
+        when ::Net::HTTPRedirection
+          url = response['location']
+          # Handle relative redirects
+          url = "#{uri.scheme}://#{hostname}:#{uri.port}#{url}" if url.start_with?('/')
+          return nil, url
+        else
+          return response, nil
         end
       end
     end
