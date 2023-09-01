@@ -84,7 +84,6 @@ class SsrfFilter
   }.freeze
 
   FIBER_HOSTNAME_KEY = :__ssrf_filter_hostname
-  FIBER_ADDRESS_KEY = :__ssrf_filter_address
 
   class Error < ::StandardError
   end
@@ -107,7 +106,6 @@ class SsrfFilter
   %i[get put post delete head patch].each do |method|
     define_singleton_method(method) do |url, options = {}, &block|
       ::SsrfFilter::Patch::SSLSocket.apply!
-      ::SsrfFilter::Patch::Resolv.apply!
 
       original_url = url
       scheme_whitelist = options[:scheme_whitelist] || DEFAULT_SCHEME_WHITELIST
@@ -189,7 +187,7 @@ class SsrfFilter
     http_options = options[:http_options] || {}
     http_options[:use_ssl] = (uri.scheme == 'https')
 
-    with_forced_hostname(hostname, ip) do
+    with_forced_hostname(hostname) do
       ::Net::HTTP.start(uri.hostname, uri.port, **http_options) do |http|
         response = http.request(request) do |res|
           block&.call(res)
@@ -221,13 +219,11 @@ class SsrfFilter
   end
   private_class_method :validate_request
 
-  def self.with_forced_hostname(hostname, ip, &_block)
+  def self.with_forced_hostname(hostname, &_block)
     ::Thread.current[FIBER_HOSTNAME_KEY] = hostname
-    ::Thread.current[FIBER_ADDRESS_KEY] = ip
     yield
   ensure
     ::Thread.current[FIBER_HOSTNAME_KEY] = nil
-    ::Thread.current[FIBER_ADDRESS_KEY] = nil
   end
   private_class_method :with_forced_hostname
 end

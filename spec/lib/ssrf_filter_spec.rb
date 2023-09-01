@@ -146,27 +146,21 @@ describe SsrfFilter do
   describe 'with_forced_hostname' do
     it 'sets the value for the block and clear it afterwards' do
       expect(Thread.current[described_class::FIBER_HOSTNAME_KEY]).to be_nil
-      expect(Thread.current[described_class::FIBER_ADDRESS_KEY]).to be_nil
-      described_class.with_forced_hostname('test', '1.2.3.4') do
+      described_class.with_forced_hostname('test') do
         expect(Thread.current[described_class::FIBER_HOSTNAME_KEY]).to eq('test')
-        expect(Thread.current[described_class::FIBER_ADDRESS_KEY]).to eq('1.2.3.4')
       end
       expect(Thread.current[described_class::FIBER_HOSTNAME_KEY]).to be_nil
-      expect(Thread.current[described_class::FIBER_ADDRESS_KEY]).to be_nil
     end
 
     it 'clears the value even if an exception is raised' do
       expect(Thread.current[described_class::FIBER_HOSTNAME_KEY]).to be_nil
-      expect(Thread.current[described_class::FIBER_ADDRESS_KEY]).to be_nil
       expect do
-        described_class.with_forced_hostname('test', '1.2.3.4') do
+        described_class.with_forced_hostname('test') do
           expect(Thread.current[described_class::FIBER_HOSTNAME_KEY]).to eq('test')
-          expect(Thread.current[described_class::FIBER_ADDRESS_KEY]).to eq('1.2.3.4')
           raise StandardError
         end
       end.to raise_error(StandardError)
       expect(Thread.current[described_class::FIBER_HOSTNAME_KEY]).to be_nil
-      expect(Thread.current[described_class::FIBER_ADDRESS_KEY]).to be_nil
     end
   end
 
