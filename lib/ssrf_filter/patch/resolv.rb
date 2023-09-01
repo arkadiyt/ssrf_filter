@@ -21,7 +21,7 @@ class SsrfFilter
       class PatchedRegexp < Regexp
         def ===(other)
           if ::Thread.current.key?(::SsrfFilter::FIBER_ADDRESS_KEY) &&
-             other.object_id.equal?(::Thread.current[::SsrfFilter::FIBER_ADDRESS_KEY].object_id)
+             other.eql?(::Thread.current[::SsrfFilter::FIBER_ADDRESS_KEY])
             false
           else
             super(other)

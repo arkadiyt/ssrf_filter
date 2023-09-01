@@ -29,5 +29,16 @@ describe ::SsrfFilter::Patch::Resolv do
       expect(described_class.new(Resolv::IPv4::Regex) === ipaddress2).to be true
       # rubocop:enable Style/CaseEquality
     end
+
+    it 'forces the ip regex to not match the same supplied address' do
+      # rubocop:disable Style/CaseEquality
+      ip_address = '1.2.3.4'
+      same_ip_address = '1.2.3.4'.clone
+      SsrfFilter.send(:with_forced_hostname, nil, ip_address) do
+        expect(described_class.new(Resolv::IPv4::Regex) === same_ip_address).to be false
+      end
+      expect(described_class.new(Resolv::IPv4::Regex) === same_ip_address).to be true
+      # rubocop:enable Style/CaseEquality
+    end
   end
 end
