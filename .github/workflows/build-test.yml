@@ -2,6 +2,7 @@ name: Build-test
 
 on:
   push:
+  pull_request_target:
   workflow_call:
 
 jobs:
