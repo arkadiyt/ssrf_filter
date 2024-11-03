@@ -1,3 +1,7 @@
+### main
+* Drop support for ruby 2.6, add support for ruby 3.3
+* Stop patching OpenSSL (resolves https://github.com/arkadiyt/ssrf_filter/issues/72) (([arkadiyt](https://github.com/arkadiyt/ssrf_filter/pull/73)))
+
 ### 1.1.2 (9/11/2023)
 * Fix a bug introduced in 1.1.0 when reading non-streaming bodies from responses ([mshibuya](https://github.com/arkadiyt/ssrf_filter/pull/60))
 * Test against ruby 3.2 ([petergoldstein](https://github.com/arkadiyt/ssrf_filter/pull/62))

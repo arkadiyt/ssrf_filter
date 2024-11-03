@@ -47,8 +47,7 @@ describe SsrfFilter do
     end
 
     it 'returns true for unknown ip families' do
-      allow(public_ipv4).to receive(:ipv4?).and_return(false)
-      allow(public_ipv4).to receive(:ipv6?).and_return(false)
+      allow(public_ipv4).to receive_messages(ipv4?: false, ipv6?: false)
       expect(described_class.unsafe_ip_address?(public_ipv4)).to be(true)
     end
   end
@@ -79,7 +78,7 @@ describe SsrfFilter do
 
   describe 'fetch_once' do
     it 'sets the host header' do
-      stub_request(:post, "https://#{public_ipv4}").with(headers: {host: 'www.example.com'})
+      stub_request(:post, 'https://www.example.com').with(headers: {host: 'www.example.com'})
         .to_return(status: 200, body: 'response body')
       response, url = described_class.fetch_once(URI('https://www.example.com'), public_ipv4.to_s, :post, {})
       expect(response.code).to eq('200')
@@ -88,7 +87,7 @@ describe SsrfFilter do
     end
 
     it 'does not send the port in the host header for default ports (http)' do
-      stub_request(:post, "http://#{public_ipv4}").with(headers: {host: 'www.example.com'})
+      stub_request(:post, 'http://www.example.com').with(headers: {host: 'www.example.com'})
         .to_return(status: 200, body: 'response body')
       response, url = described_class.fetch_once(URI('http://www.example.com'), public_ipv4.to_s, :post, {})
       expect(response.code).to eq('200')
@@ -97,8 +96,7 @@ describe SsrfFilter do
     end
 
     it 'sends the port in the host header for non-default ports' do
-      stub_request(:post, "https://#{public_ipv4}:80").with(headers: {host: 'www.example.com:80'})
-        .to_return(status: 200, body: 'response body')
+      stub_request(:post, 'https://www.example.com:80').to_return(status: 200, body: 'response body')
       response, url = described_class.fetch_once(URI('https://www.example.com:80'), public_ipv4.to_s, :post, {})
       expect(response.code).to eq('200')
       expect(response.body).to eq('response body')
@@ -106,7 +104,7 @@ describe SsrfFilter do
     end
 
     it 'passes headers, params, and blocks' do
-      stub_request(:get, "https://#{public_ipv4}/?key=value").with(headers:
+      stub_request(:get, 'https://www.example.com/?key=value').with(headers:
         {host: 'www.example.com', header: 'value', header2: 'value2'}).to_return(status: 200, body: 'response body')
       options = {
         headers: {'header' => 'value'},
@@ -123,8 +121,8 @@ describe SsrfFilter do
     end
 
     it 'merges params' do
-      stub_request(:get, "https://#{public_ipv4}/?key=value&key2=value2")
-        .with(headers: {host: 'www.example.com'}).to_return(status: 200, body: 'response body')
+      stub_request(:get, 'https://www.example.com/?key=value&key2=value2')
+        .to_return(status: 200, body: 'response body')
       uri = URI('https://www.example.com/?key=value')
       response, url = described_class.fetch_once(uri, public_ipv4.to_s, :get, params: {'key2' => 'value2'})
       expect(response.code).to eq('200')
@@ -132,35 +130,14 @@ describe SsrfFilter do
       expect(url).to be_nil
     end
 
-    it 'does not use tls for http urls', only: true do
-      expect(::Net::HTTP).to receive(:start).with(public_ipv4.to_s, 80, use_ssl: false)
+    it 'does not use tls for http urls' do
+      expect(Net::HTTP).to receive(:start).with('www.example.com', 80, hash_including(use_ssl: false))
       described_class.fetch_once(URI('http://www.example.com'), public_ipv4.to_s, :get, {})
     end
 
     it 'uses tls for https urls' do
-      expect(::Net::HTTP).to receive(:start).with(public_ipv4.to_s, 443, use_ssl: true)
+      expect(Net::HTTP).to receive(:start).with('www.example.com', 443, hash_including(use_ssl: true))
       described_class.fetch_once(URI('https://www.example.com'), public_ipv4.to_s, :get, {})
-    end
-  end
-
-  describe 'with_forced_hostname' do
-    it 'sets the value for the block and clear it afterwards' do
-      expect(Thread.current[described_class::FIBER_HOSTNAME_KEY]).to be_nil
-      described_class.with_forced_hostname('test') do
-        expect(Thread.current[described_class::FIBER_HOSTNAME_KEY]).to eq('test')
-      end
-      expect(Thread.current[described_class::FIBER_HOSTNAME_KEY]).to be_nil
-    end
-
-    it 'clears the value even if an exception is raised' do
-      expect(Thread.current[described_class::FIBER_HOSTNAME_KEY]).to be_nil
-      expect do
-        described_class.with_forced_hostname('test') do
-          expect(Thread.current[described_class::FIBER_HOSTNAME_KEY]).to eq('test')
-          raise StandardError
-        end
-      end.to raise_error(StandardError)
-      expect(Thread.current[described_class::FIBER_HOSTNAME_KEY]).to be_nil
     end
   end
 
@@ -191,8 +168,8 @@ describe SsrfFilter do
   end
 
   describe 'integration tests' do
-    # To test the SSLSocket patching logic (and hit 100% code coverage), we need to make a real connection to a
-    # TLS-enabled server. To do this we create a private key and certificate, spin up a web server in
+    # To hit 100% code coverage, we need to make a real connection to a TLS-enabled server.
+    # To do this we create a private key and certificate, spin up a web server in
     # a thread (serving traffic on localhost), and make a request to the server. This requires several things:
     # 1) creating a custom trust store with our certificate and using that for validation
     # 2) allowing (non-mocked) network connections
@@ -244,7 +221,7 @@ describe SsrfFilter do
         store.add_cert(certificate)
       end
 
-      expect(::Net::HTTP).to receive(:start).exactly(certificates.length).times
+      expect(Net::HTTP).to receive(:start).exactly(certificates.length).times
         .and_wrap_original do |orig, *args, &block|
         args.last[:cert_store] = store # Inject our custom trust store
         orig.call(*args, &block)
@@ -452,22 +429,17 @@ describe SsrfFilter do
     end
 
     it 'fails if there are too many redirects' do
-      stub_request(:get, "https://#{public_ipv4}").with(headers: {host: 'www.example.com'})
-        .to_return(status: 301, headers: {location: private_ipv4})
-      resolver = proc { [public_ipv4] }
+      stub_request(:get, 'https://www.example.com').to_return(status: 301, headers: {location: 'https://example2.com'})
       expect do
-        described_class.get('https://www.example.com', resolver: resolver, max_redirects: 0)
+        described_class.get('https://www.example.com', max_redirects: 0)
       end.to raise_error(described_class::TooManyRedirects)
     end
 
     it 'returns the last response if there are too many redirects and unfollowed redirects are allowed' do
-      stub_request(:get, "https://#{public_ipv4}").with(headers: {host: 'www.example.com'})
-        .to_return(status: 301, headers: {location: 'https://www.example2.com'})
-      resolver = proc { [public_ipv4] }
+      stub_request(:get, 'https://www.example.com').to_return(status: 301, headers: {location: 'https://www.example2.com'})
       response =
         described_class.get(
           'https://www.example.com',
-          resolver: resolver,
           allow_unfollowed_redirects: true,
           max_redirects: 0
         )
@@ -476,23 +448,15 @@ describe SsrfFilter do
     end
 
     it 'fails if the redirected url is not in the scheme whitelist' do
-      stub_request(:put, "https://#{public_ipv4}").with(headers: {host: 'www.example.com'})
-        .to_return(status: 301, headers: {location: 'ftp://www.example.com'})
-      resolver = proc { [public_ipv4] }
+      stub_request(:put, 'https://www.example.com').to_return(status: 301, headers: {location: 'ftp://www.example.com'})
       expect do
-        described_class.put('https://www.example.com', resolver: resolver)
+        described_class.put('https://www.example.com')
       end.to raise_error(described_class::InvalidUriScheme)
     end
 
     it 'fails if the redirected url has no public ip address' do
-      stub_request(:delete, "https://#{public_ipv4}").with(headers: {host: 'www.example.com'})
-        .to_return(status: 301, headers: {location: 'https://www.example2.com'})
-      resolver = proc do |hostname|
-        [{
-          'www.example.com' => public_ipv4,
-          'www.example2.com' => private_ipv6
-        }[hostname]]
-      end
+      stub_request(:delete, 'https://www.example.com').to_return(status: 301, headers: {location: 'https://www.example2.com'})
+      resolver = proc { [private_ipv6] }
       expect do
         described_class.delete('https://www.example.com', resolver: resolver)
       end.to raise_error(described_class::PrivateIPAddress)
@@ -512,32 +476,18 @@ describe SsrfFilter do
     end
 
     it 'follows redirects and succeed on a public hostname' do
-      stub_request(:post, "https://#{public_ipv4}/path?key=value").with(headers: {host: 'www.example.com'})
-        .to_return(status: 301, headers: {location: 'https://www.example2.com/path2?key2=value2'})
-      stub_request(:post, "https://[#{public_ipv6}]/path2?key2=value2")
-        .with(headers: {host: 'www.example2.com'}).to_return(status: 200, body: 'response body')
-      resolver = proc do |hostname|
-        [{
-          'www.example.com' => public_ipv4,
-          'www.example2.com' => public_ipv6
-        }[hostname]]
-      end
-      response = described_class.post('https://www.example.com/path?key=value', resolver: resolver)
+      stub_request(:post, 'https://www.example.com/path?key=value').to_return(status: 301, headers: {location: 'https://www.example2.com/path2?key2=value2'})
+      stub_request(:post, 'https://www.example2.com/path2?key2=value2').to_return(status: 200, body: 'response body')
+      response = described_class.post('https://www.example.com/path?key=value')
       expect(response.code).to eq('200')
       expect(response.body).to eq('response body')
     end
 
     it 'follows relative redirects and succeed' do
-      stub_request(:post, "https://#{public_ipv4}/path?key=value").with(headers: {host: 'www.example.com'})
-        .to_return(status: 301, headers: {location: '/path2?key2=value2'})
-      stub_request(:post, "https://#{public_ipv4}/path2?key2=value2")
-        .with(headers: {host: 'www.example.com'}).to_return(status: 200, body: 'response body')
-      resolver = proc do |hostname|
-        [{
-          'www.example.com' => public_ipv4
-        }[hostname]]
-      end
-      response = described_class.post('https://www.example.com/path?key=value', resolver: resolver)
+      stub_request(:post, 'https://www.example.com/path?key=value').to_return(status: 301,
+                                                                              headers: {location: '/path2?key2=value2'})
+      stub_request(:post, 'https://www.example.com/path2?key2=value2').to_return(status: 200, body: 'response body')
+      response = described_class.post('https://www.example.com/path?key=value')
       expect(response.code).to eq('200')
       expect(response.body).to eq('response body')
     end

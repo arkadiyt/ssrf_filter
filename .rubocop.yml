@@ -7,8 +7,8 @@ require:
 AllCops:
   NewCops: enable
 
-Gemspec/RequiredRubyVersion:
-  Enabled: false
+Gemspec/DevelopmentDependencies:
+  EnforcedStyle: gemspec
 
 Metrics/AbcSize:
   Enabled: false
@@ -52,14 +52,14 @@ Layout/SpaceInsideHashLiteralBraces:
 RSpec/BeforeAfterAll:
   Enabled: false
 
+RSpec/IndexedLet:
+  Enabled: false
+
 RSpec/MultipleExpectations:
   Enabled: false
 
 RSpec/ExampleLength:
   Max: 40
-
-RSpec/FilePath:
-  SpecSuffixOnly: true
 
 RSpec/MessageSpies:
   EnforcedStyle: receive

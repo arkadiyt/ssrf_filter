@@ -10,7 +10,7 @@ class SsrfFilter
     mask_addr = ipaddr.instance_variable_get('@mask_addr')
     raise ArgumentError, 'Invalid mask' if mask_addr.zero?
 
-    while (mask_addr & 0x1).zero?
+    while mask_addr.nobits?(0x1)
       mask_addr >>= 1
     end
 
@@ -84,8 +84,6 @@ class SsrfFilter
     patch: ::Net::HTTP::Patch
   }.freeze
 
-  FIBER_HOSTNAME_KEY = :__ssrf_filter_hostname
-
   class Error < ::StandardError
   end
 
@@ -106,8 +104,6 @@ class SsrfFilter
 
   %i[get put post delete head patch].each do |method|
     define_singleton_method(method) do |url, options = {}, &block|
-      ::SsrfFilter::Patch::SSLSocket.apply!
-
       original_url = url
       scheme_whitelist = options.fetch(:scheme_whitelist, DEFAULT_SCHEME_WHITELIST)
       resolver = options.fetch(:resolver, DEFAULT_RESOLVER)
@@ -156,16 +152,16 @@ class SsrfFilter
   end
   private_class_method :ipaddr_has_mask?
 
-  def self.host_header(hostname, uri)
+  def self.normalized_hostname(uri)
     # Attach port for non-default as per RFC2616
     if (uri.port == 80 && uri.scheme == 'http') ||
        (uri.port == 443 && uri.scheme == 'https')
-      hostname
+      uri.hostname
     else
-      "#{hostname}:#{uri.port}"
+      "#{uri.hostname}:#{uri.port}"
     end
   end
-  private_class_method :host_header
+  private_class_method :normalized_hostname
 
   def self.fetch_once(uri, ip, verb, options, &block)
     if options[:params]
@@ -174,11 +170,8 @@ class SsrfFilter
       uri.query = ::URI.encode_www_form(params)
     end
 
-    hostname = uri.hostname
-    uri.hostname = ip
-
     request = VERB_MAP[verb].new(uri)
-    request['host'] = host_header(hostname, uri)
+    request['host'] = normalized_hostname(uri)
 
     Array(options[:headers]).each do |header, value|
       request[header] = value
@@ -189,24 +182,24 @@ class SsrfFilter
     options[:request_proc].call(request) if options[:request_proc].respond_to?(:call)
     validate_request(request)
 
-    http_options = options[:http_options] || {}
-    http_options[:use_ssl] = (uri.scheme == 'https')
+    http_options = (options[:http_options] || {}).merge(
+      use_ssl: uri.scheme == 'https',
+      ipaddr: ip
+    )
 
-    with_forced_hostname(hostname) do
-      ::Net::HTTP.start(uri.hostname, uri.port, **http_options) do |http|
-        response = http.request(request) do |res|
-          block&.call(res)
-        end
-        case response
-        when ::Net::HTTPRedirection
-          url = response['location']
-          # Handle relative redirects
-          url = "#{uri.scheme}://#{hostname}:#{uri.port}#{url}" if url.start_with?('/')
-        else
-          url = nil
-        end
-        return response, url
+    ::Net::HTTP.start(uri.hostname, uri.port, **http_options) do |http|
+      response = http.request(request) do |res|
+        block&.call(res)
       end
+      case response
+      when ::Net::HTTPRedirection
+        url = response['location']
+        # Handle relative redirects
+        url = "#{uri.scheme}://#{normalized_hostname(uri)}#{url}" if url.start_with?('/')
+      else
+        url = nil
+      end
+      return response, url
     end
   end
   private_class_method :fetch_once
@@ -223,12 +216,4 @@ class SsrfFilter
     end
   end
   private_class_method :validate_request
-
-  def self.with_forced_hostname(hostname, &_block)
-    ::Thread.current[FIBER_HOSTNAME_KEY] = hostname
-    yield
-  ensure
-    ::Thread.current[FIBER_HOSTNAME_KEY] = nil
-  end
-  private_class_method :with_forced_hostname
 end
