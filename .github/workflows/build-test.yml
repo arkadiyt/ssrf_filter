@@ -1,15 +1,14 @@
 name: Build-test
 
 on:
-  push:
-  pull_request_target:
+  pull_request:
   workflow_call:
 
 jobs:
   build-test:
     strategy:
       matrix:
-        ruby-version: [2.6.0, 2.7.0, 3.0.0, 3.1.0, 3.2.0, head]
+        ruby-version: [2.7.0, 3.0.0, 3.1.0, 3.2.0, 3.3.0, head]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
