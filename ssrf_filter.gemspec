@@ -14,7 +14,8 @@ Gem::Specification.new do |gem|
   gem.homepage    = 'https://github.com/arkadiyt/ssrf_filter'
   gem.license     = 'MIT'
   gem.files       = Dir['lib/**/*.rb']
-  gem.metadata    = {'rubygems_mfa_required' => 'true'}
+  gem.metadata    = {'changelog_uri' => "#{gem.homepage}/blob/main/CHANGELOG.md",
+                     'rubygems_mfa_required' => 'true'}
 
   gem.add_development_dependency('base64', '~> 0.2.0') # For ruby >= 3.4
   gem.add_development_dependency('bundler-audit', '~> 0.9.2')
