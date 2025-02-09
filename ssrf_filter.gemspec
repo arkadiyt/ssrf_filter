@@ -19,7 +19,6 @@ Gem::Specification.new do |gem|
 
   gem.add_development_dependency('base64', '~> 0.2.0') # For ruby >= 3.4
   gem.add_development_dependency('bundler-audit', '~> 0.9.2')
-  gem.add_development_dependency('pry-byebug')
   gem.add_development_dependency('rspec', '~> 3.13.0')
   gem.add_development_dependency('rubocop', '~> 1.68.0')
   gem.add_development_dependency('rubocop-rspec', '~> 3.2.0')
