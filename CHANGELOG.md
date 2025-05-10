@@ -1,3 +1,6 @@
+### 1.3.0 (5/10/2025)
+* Correctly handle 3xx responses with no Location header (resolves [#79](https://github.com/arkadiyt/ssrf_filter/issues/79)) ([arkadiyt](https://github.com/arkadiyt/ssrf_filter/pull/80))
+
 ### 1.2.0 (11/7/2024)
 * Drop support for ruby 2.6, add support for ruby 3.3 ([arkadiyt](https://github.com/arkadiyt/ssrf_filter/pull/73))
 * Stop patching OpenSSL (resolves [#72](https://github.com/arkadiyt/ssrf_filter/issues/72)) ([arkadiyt](https://github.com/arkadiyt/ssrf_filter/pull/73))
