@@ -139,6 +139,15 @@ describe SsrfFilter do
       expect(Net::HTTP).to receive(:start).with('www.example.com', 443, hash_including(use_ssl: true))
       described_class.fetch_once(URI('https://www.example.com'), public_ipv4.to_s, :get, {})
     end
+
+    it 'returns for 3xx responses with no Location header' do
+      stub_request(:get, 'https://www.example.com/')
+        .to_return(status: 304)
+      uri = URI('https://www.example.com/')
+      response, url = described_class.fetch_once(uri, public_ipv4.to_s, :get, {})
+      expect(response.code).to eq('304')
+      expect(url).to be_nil
+    end
   end
 
   describe 'validate_request' do

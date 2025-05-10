@@ -195,7 +195,7 @@ class SsrfFilter
       when ::Net::HTTPRedirection
         url = response['location']
         # Handle relative redirects
-        url = "#{uri.scheme}://#{normalized_hostname(uri)}#{url}" if url.start_with?('/')
+        url = "#{uri.scheme}://#{normalized_hostname(uri)}#{url}" if url&.start_with?('/')
       else
         url = nil
       end
