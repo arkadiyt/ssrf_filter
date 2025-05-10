@@ -26,7 +26,7 @@ This gem provides a safe and easy way to fetch content from user-submitted urls.
 1) Add the gem to your Gemfile:
 
 ```ruby
-gem 'ssrf_filter', '~> 1.2.0'
+gem 'ssrf_filter', '~> 1.3.0'
 ```
 
 2) In your code:
