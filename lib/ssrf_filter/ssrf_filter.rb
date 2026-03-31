@@ -6,7 +6,7 @@ require 'resolv'
 require 'uri'
 
 class SsrfFilter
-  def self.prefixlen_from_ipaddr(ipaddr)
+  private_class_method def self.prefixlen_from_ipaddr(ipaddr)
     mask_addr = ipaddr.instance_variable_get('@mask_addr')
     raise ArgumentError, 'Invalid mask' if mask_addr.zero?
 
@@ -22,7 +22,19 @@ class SsrfFilter
 
     length
   end
-  private_class_method :prefixlen_from_ipaddr
+
+  private_class_method def self.ipv4_from_rfc6052(ipv6_addr, prefix_len)
+    n = ipv6_addr.to_i
+    ipv4_int = case prefix_len
+    when 32 then (n >> 64) & 0xFFFF_FFFF
+    when 40 then (((n >> 64) & 0xFFFFFF) << 8)  | ((n >> 48) & 0xFF)
+    when 48 then (((n >> 64) & 0xFFFF)   << 16) | ((n >> 40) & 0xFFFF)
+    when 56 then (((n >> 64) & 0xFF)     << 24) | ((n >> 32) & 0xFFFFFF)
+    when 64 then (n >> 24) & 0xFFFF_FFFF
+    when 96 then n & 0xFFFF_FFFF
+    end
+    ::IPAddr.new(ipv4_int, Socket::AF_INET) if ipv4_int
+  end
 
   # https://en.wikipedia.org/wiki/Reserved_IP_addresses
   IPV4_BLACKLIST = [
@@ -34,7 +46,6 @@ class SsrfFilter
     ::IPAddr.new('172.16.0.0/12'), # Private network
     ::IPAddr.new('192.0.0.0/24'), # IETF Protocol Assignments
     ::IPAddr.new('192.0.2.0/24'), # TEST-NET-1, documentation and examples
-    ::IPAddr.new('192.88.99.0/24'), # IPv6 to IPv4 relay (includes 2002::/16)
     ::IPAddr.new('192.168.0.0/16'), # Private network
     ::IPAddr.new('198.18.0.0/15'), # Network benchmark tests
     ::IPAddr.new('198.51.100.0/24'), # TEST-NET-2, documentation and examples
@@ -44,9 +55,11 @@ class SsrfFilter
     ::IPAddr.new('255.255.255.255') # Broadcast
   ].freeze
 
+  # NAT64 local-use prefix (RFC 8215), uses RFC 6052 /48 encoding (checked at runtime).
+  NAT64_LOCAL_PREFIX = ::IPAddr.new('64:ff9b:1::/48').freeze
+
   IPV6_BLACKLIST = ([
     ::IPAddr.new('::1/128'), # Loopback
-    ::IPAddr.new('64:ff9b::/96'), # IPv4/IPv6 translation (RFC 6052)
     ::IPAddr.new('100::/64'), # Discard prefix (RFC 6666)
     ::IPAddr.new('2001::/32'), # Teredo tunneling
     ::IPAddr.new('2001:10::/28'), # Deprecated (previously ORCHID)
@@ -60,10 +73,14 @@ class SsrfFilter
     prefixlen = prefixlen_from_ipaddr(ipaddr)
 
     # Don't call ipaddr.ipv4_compat because it prints out a deprecation warning on ruby 2.5+
-    ipv4_compatible = IPAddr.new(ipaddr.to_i, Socket::AF_INET6).mask(96 + prefixlen)
-    ipv4_mapped = ipaddr.ipv4_mapped.mask(80 + prefixlen)
+    ipv4_compatible  = IPAddr.new(ipaddr.to_i, Socket::AF_INET6).mask(96 + prefixlen)
+    ipv4_mapped      = ipaddr.ipv4_mapped.mask(80 + prefixlen)
+    # IPv4-translated (RFC 2765): ::ffff:0:x.x.x.x/96+n
+    ipv4_translated  = IPAddr.new("::ffff:0:#{ipaddr}").mask(96 + prefixlen)
+    # NAT64 well-known prefix (RFC 6052): 64:ff9b::x.x.x.x/96+n
+    nat64_well_known = IPAddr.new("64:ff9b::#{ipaddr}").mask(96 + prefixlen)
 
-    [ipv4_compatible, ipv4_mapped]
+    [ipv4_compatible, ipv4_mapped, ipv4_translated, nat64_well_known]
   end).freeze
 
   DEFAULT_SCHEME_WHITELIST = %w[http https].freeze
@@ -102,7 +119,7 @@ class SsrfFilter
   class CRLFInjection < Error
   end
 
-  %i[get put post delete head patch].each do |method|
+  VERB_MAP.each_key do |method|
     define_singleton_method(method) do |url, options = {}, &block|
       original_url = url
       scheme_whitelist = options.fetch(:scheme_whitelist, DEFAULT_SCHEME_WHITELIST)
@@ -136,23 +153,32 @@ class SsrfFilter
     end
   end
 
-  def self.unsafe_ip_address?(ip_address)
+  private_class_method def self.unsafe_ip_address?(ip_address)
     return true if ipaddr_has_mask?(ip_address)
 
     return IPV4_BLACKLIST.any? { |range| range.include?(ip_address) } if ip_address.ipv4?
-    return IPV6_BLACKLIST.any? { |range| range.include?(ip_address) } if ip_address.ipv6?
+
+    if ip_address.ipv6?
+      return true if IPV6_BLACKLIST.any? { |range| range.include?(ip_address) }
+
+      # RFC 6052 /48 encoding for NAT64 local-use prefix (RFC 8215): 64:ff9b:1::/48
+      # IPv4 is split around u-bits at positions 64-71, so must be decoded at runtime
+      if NAT64_LOCAL_PREFIX.dup.include?(ip_address)
+        ipv4 = ipv4_from_rfc6052(ip_address, 48)
+        return unsafe_ip_address?(ipv4)
+      end
+      return false
+    end
 
     true
   end
-  private_class_method :unsafe_ip_address?
 
-  def self.ipaddr_has_mask?(ipaddr)
+  private_class_method def self.ipaddr_has_mask?(ipaddr)
     range = ipaddr.to_range
     range.first != range.last
   end
-  private_class_method :ipaddr_has_mask?
 
-  def self.normalized_hostname(uri)
+  private_class_method def self.normalized_hostname(uri)
     # Attach port for non-default as per RFC2616
     if (uri.port == 80 && uri.scheme == 'http') ||
        (uri.port == 443 && uri.scheme == 'https')
@@ -161,9 +187,8 @@ class SsrfFilter
       "#{uri.hostname}:#{uri.port}"
     end
   end
-  private_class_method :normalized_hostname
 
-  def self.fetch_once(uri, ip, verb, options, &block)
+  private_class_method def self.fetch_once(uri, ip, verb, options, &block)
     if options[:params]
       params = uri.query ? ::URI.decode_www_form(uri.query).to_h : {}
       params.merge!(options[:params])
@@ -202,9 +227,8 @@ class SsrfFilter
       return response, url
     end
   end
-  private_class_method :fetch_once
 
-  def self.validate_request(request)
+  private_class_method def self.validate_request(request)
     # RFC822 allows multiline "folded" headers:
     # https://tools.ietf.org/html/rfc822#section-3.1
     # In practice if any user input is ever supplied as a header key/value, they'll get
@@ -215,5 +239,4 @@ class SsrfFilter
       end
     end
   end
-  private_class_method :validate_request
 end

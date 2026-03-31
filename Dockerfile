@@ -1,4 +1,4 @@
-FROM ruby:3.0.0
+FROM ruby:3.4.9
 
 RUN apt update && apt-get install -y vim tmux tig
 

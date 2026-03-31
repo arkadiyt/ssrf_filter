@@ -42,6 +42,18 @@ describe SsrfFilter do
       end
     end
 
+    it 'returns true for RFC 6052 /48 encoded private IPv4 addresses (nat64 local prefix)' do
+      # 10.0.0.1 -> upper=0x0a00, lower=0x0001 -> 64:ff9b:1:a00:0:100::
+      expect(described_class.unsafe_ip_address?(IPAddr.new('64:ff9b:1:a00:0:100::'))).to be(true)
+      # 192.168.1.1 -> upper=0xc0a8, lower=0x0101 -> 64:ff9b:1:c0a8:1:100::
+      expect(described_class.unsafe_ip_address?(IPAddr.new('64:ff9b:1:c0a8:1:100::'))).to be(true)
+    end
+
+    it 'returns false for RFC 6052 /48 encoded public IPv4 addresses (nat64 local prefix)' do
+      # 8.8.8.8 -> upper=0x0808, lower=0x0808 -> 64:ff9b:1:808:8:800::
+      expect(described_class.unsafe_ip_address?(IPAddr.new('64:ff9b:1:808:8:800::'))).to be(false)
+    end
+
     it 'returns false for public ipv6 addresses' do
       expect(described_class.unsafe_ip_address?(public_ipv6)).to be(false)
     end
@@ -49,6 +61,22 @@ describe SsrfFilter do
     it 'returns true for unknown ip families' do
       allow(public_ipv4).to receive_messages(ipv4?: false, ipv6?: false)
       expect(described_class.unsafe_ip_address?(public_ipv4)).to be(true)
+    end
+  end
+
+  describe 'ipv4_from_rfc6052' do
+    it 'extracts the embedded IPv4 for each prefix length' do
+      # All encode 10.0.0.1 (0x0a000001) using RFC 6052 for the given prefix length
+      {
+        32 => IPAddr.new('64:ff9b:a00:1::'),      # IPv4 at bits 32-63
+        40 => IPAddr.new('64:ff9b:10a:0:1::'),    # upper 24 at 40-63, lower 8 at 72-79
+        48 => IPAddr.new('64:ff9b:1:a00:0:100::'), # upper 16 at 48-63, lower 16 at 72-87
+        56 => IPAddr.new('64:ff9b:0:a:0:1::'),    # upper 8 at 56-63, lower 24 at 72-95
+        64 => IPAddr.new('1:2:3:4:a:0:100:0'),    # IPv4 at bits 72-103 (after u-bits at 64-71)
+        96 => IPAddr.new('64:ff9b::a00:1')        # IPv4 at bits 96-127
+      }.each do |prefix_len, ipv6|
+        expect(described_class.ipv4_from_rfc6052(ipv6, prefix_len)).to eq(IPAddr.new('10.0.0.1'))
+      end
     end
   end
 
