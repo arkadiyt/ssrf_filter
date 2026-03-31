@@ -1,3 +1,6 @@
+### 1.4.0 (3/30/2026)
+* Fix some missing denylist entries ([tipsen](https://hackerone.com/tipsen), [arkadiyt](https://github.com/arkadiyt/ssrf_filter/pull/84))
+
 ### 1.3.0 (5/10/2025)
 * Correctly handle 3xx responses with no Location header (resolves [#79](https://github.com/arkadiyt/ssrf_filter/issues/79)) ([arkadiyt](https://github.com/arkadiyt/ssrf_filter/pull/80))
 
