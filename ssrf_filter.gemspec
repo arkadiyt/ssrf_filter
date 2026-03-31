@@ -24,6 +24,7 @@ Gem::Specification.new do |gem|
   gem.add_development_dependency('rubocop-rspec', '~> 3.2.0')
   gem.add_development_dependency('simplecov', '~> 0.22.0')
   gem.add_development_dependency('simplecov-lcov', '~> 0.8.0')
+  gem.add_development_dependency('tsort', '0.1.0') # Removed from standard gems in ruby >= 4.1
   gem.add_development_dependency('webmock', '>= 3.24.0')
   gem.add_development_dependency('webrick')
 end
