@@ -61,6 +61,8 @@ Options hash:
 - `:http_options` – Options to pass to [Net::HTTP.start](https://ruby-doc.org/stdlib-2.6.4/libdoc/net/http/rdoc/Net/HTTP.html#method-c-start). Use this to set custom timeouts or SSL options.
 - `:request_proc` - a proc that receives the request object, for custom modifications before sending the request.
 - `:allow_unfollowed_redirects` - If true and your request hits the maximum number of redirects, the last response will be returned instead of raising an error. Defaults to false.
+- `:sensitive_headers` — array of header names (case-insensitive) that will not be forwarded when following a cross-origin redirect (when the scheme, host, or port changes). Defaults to `%w[authorization cookie]`. Pass `[]` to disable this protection.
+- `:on_cross_origin_redirect` — controls behavior when a cross-origin redirect would send sensitive headers. `:strip` (default) silently removes them and follows the redirect; `:raise` raises `SsrfFilter::CredentialLeakage` instead.
 
 Returns:
 

@@ -91,6 +91,8 @@ class SsrfFilter
 
   DEFAULT_ALLOW_UNFOLLOWED_REDIRECTS = false
   DEFAULT_MAX_REDIRECTS = 10
+  DEFAULT_SENSITIVE_HEADERS = %w[authorization cookie].freeze
+  DEFAULT_ON_CROSS_ORIGIN_REDIRECT = :strip
 
   VERB_MAP = {
     get: ::Net::HTTP::Get,
@@ -119,14 +121,19 @@ class SsrfFilter
   class CRLFInjection < Error
   end
 
+  class CredentialLeakage < Error
+  end
+
   VERB_MAP.each_key do |method|
     define_singleton_method(method) do |url, options = {}, &block|
+      url = url.to_s
       original_url = url
+      original_uri = URI(url)
       scheme_whitelist = options.fetch(:scheme_whitelist, DEFAULT_SCHEME_WHITELIST)
       resolver = options.fetch(:resolver, DEFAULT_RESOLVER)
       allow_unfollowed_redirects = options.fetch(:allow_unfollowed_redirects, DEFAULT_ALLOW_UNFOLLOWED_REDIRECTS)
       max_redirects = options.fetch(:max_redirects, DEFAULT_MAX_REDIRECTS)
-      url = url.to_s
+      sensitive_headers = options.fetch(:sensitive_headers, DEFAULT_SENSITIVE_HEADERS)
 
       response = nil
       (max_redirects + 1).times do
@@ -143,7 +150,14 @@ class SsrfFilter
         public_addresses = ip_addresses.reject(&method(:unsafe_ip_address?))
         raise PrivateIPAddress, "Hostname '#{hostname}' has no public ip addresses" if public_addresses.empty?
 
-        response, url = fetch_once(uri, public_addresses.sample.to_s, method, options, &block)
+        headers_to_strip = if !sensitive_headers.empty? && different_origin?(original_uri, uri)
+          sensitive_headers
+        else
+          []
+        end
+
+        response, url = fetch_once(uri, public_addresses.sample.to_s, method,
+          options.merge(headers_to_strip: headers_to_strip), &block)
         return response if url.nil?
       end
 
@@ -178,6 +192,10 @@ class SsrfFilter
     range.first != range.last
   end
 
+  private_class_method def self.different_origin?(uri1, uri2)
+    uri1.scheme != uri2.scheme || uri1.hostname != uri2.hostname || uri1.port != uri2.port
+  end
+
   private_class_method def self.normalized_hostname(uri)
     # Attach port for non-default as per RFC2616
     if (uri.port == 80 && uri.scheme == 'http') ||
@@ -205,6 +223,20 @@ class SsrfFilter
     request.body = options[:body] if options[:body]
 
     options[:request_proc].call(request) if options[:request_proc].respond_to?(:call)
+
+    headers_to_strip = Array(options[:headers_to_strip])
+    unless headers_to_strip.empty?
+      if options[:on_cross_origin_redirect] == :raise
+        leaking = headers_to_strip.select { |h| request[h] }
+        unless leaking.empty?
+          raise CredentialLeakage,
+            "Cross-origin redirect would leak sensitive headers: #{leaking.join(', ')}"
+        end
+      else
+        headers_to_strip.each { |h| request.delete(h) }
+      end
+    end
+
     validate_request(request)
 
     http_options = (options[:http_options] || {}).merge(
