@@ -522,11 +522,50 @@ describe SsrfFilter do
 
     it 'follows relative redirects and succeed' do
       stub_request(:post, 'https://www.example.com/path?key=value').to_return(status: 301,
-                                                                              headers: {location: '/path2?key2=value2'})
+        headers: {location: '/path2?key2=value2'})
       stub_request(:post, 'https://www.example.com/path2?key2=value2').to_return(status: 200, body: 'response body')
       response = described_class.post('https://www.example.com/path?key=value')
       expect(response.code).to eq('200')
       expect(response.body).to eq('response body')
+    end
+
+    it 'strips sensitive headers set via request_proc on cross-origin redirect' do
+      stub_request(:get, 'https://www.example.com/').to_return(status: 301, headers: {location: 'https://www.example2.com/'})
+      stub_request(:get, 'https://www.example2.com/').to_return(status: 200)
+      auth_header = {'Authorization' => 'Bearer token'}
+      request_proc = proc { |req| req['Authorization'] = 'Bearer token' }
+      described_class.get('https://www.example.com/', request_proc: request_proc)
+      expect(a_request(:get, 'https://www.example2.com/').with(headers: auth_header)).not_to have_been_made
+      expect(a_request(:get, 'https://www.example2.com/')).to have_been_made
+    end
+
+    it 'raises CredentialLeakage on cross-origin redirect when on_cross_origin_redirect is :raise' do
+      stub_request(:get, 'https://www.example.com/').to_return(status: 301, headers: {location: 'https://www.example2.com/'})
+      stub_request(:get, 'https://www.example2.com/').to_return(status: 200)
+      expect do
+        described_class.get('https://www.example.com/', headers: {'Authorization' => 'Bearer token'},
+          on_cross_origin_redirect: :raise)
+      end.to raise_error(described_class::CredentialLeakage)
+    end
+
+    it 'preserves sensitive headers for same-origin hops but strips them on a subsequent cross-origin hop' do
+      stub_request(:get, 'https://www.example.com/').to_return(status: 301, headers: {location: 'https://www.example.com/other'})
+      stub_request(:get, 'https://www.example.com/other').to_return(status: 301, headers: {location: 'https://www.example2.com/'})
+      stub_request(:get, 'https://www.example2.com/').to_return(status: 200)
+      auth_header = {'Authorization' => 'Bearer token'}
+      described_class.get('https://www.example.com/', headers: auth_header)
+      expect(a_request(:get, 'https://www.example.com/other').with(headers: auth_header)).to have_been_made
+      expect(a_request(:get, 'https://www.example2.com/').with(headers: auth_header)).not_to have_been_made
+    end
+
+    it 'strips sensitive headers on a same-origin redirect after an earlier cross-origin redirect' do
+      stub_request(:get, 'https://www.example.com/').to_return(status: 301, headers: {location: 'https://www.example2.com/'})
+      stub_request(:get, 'https://www.example2.com/').to_return(status: 301, headers: {location: 'https://www.example2.com/other'})
+      stub_request(:get, 'https://www.example2.com/other').to_return(status: 200)
+      auth_header = {'Authorization' => 'Bearer token'}
+      described_class.get('https://www.example.com/', headers: auth_header)
+      expect(a_request(:get, 'https://www.example2.com/').with(headers: auth_header)).not_to have_been_made
+      expect(a_request(:get, 'https://www.example2.com/other').with(headers: auth_header)).not_to have_been_made
     end
   end
 end
