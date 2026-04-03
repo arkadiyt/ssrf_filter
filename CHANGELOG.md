@@ -1,3 +1,6 @@
+### 1.5.0 (4/2/2026)
+* Fix an issue where sensitive headers could have been sent to unintended origins during redirects ([xkiluar](https://hackerone.com/xkiluar), [arkadiyt](https://github.com/arkadiyt/ssrf_filter/pull/86))
+
 ### 1.4.0 (3/30/2026)
 * Fix some missing denylist entries ([tipsen](https://hackerone.com/tipsen), [arkadiyt](https://github.com/arkadiyt/ssrf_filter/pull/84))
 
