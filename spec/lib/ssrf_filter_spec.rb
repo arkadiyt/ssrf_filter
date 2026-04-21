@@ -2,6 +2,7 @@
 
 require 'timeout'
 require 'webrick/https'
+require 'webrick/httpproxy'
 
 describe SsrfFilter do
   before :all do
@@ -159,12 +160,12 @@ describe SsrfFilter do
     end
 
     it 'does not use tls for http urls' do
-      expect(Net::HTTP).to receive(:start).with('www.example.com', 80, hash_including(use_ssl: false))
+      expect(Net::HTTP).to receive(:start).with('www.example.com', 80, nil, hash_including(use_ssl: false))
       described_class.fetch_once(URI('http://www.example.com'), public_ipv4.to_s, :get, {})
     end
 
     it 'uses tls for https urls' do
-      expect(Net::HTTP).to receive(:start).with('www.example.com', 443, hash_including(use_ssl: true))
+      expect(Net::HTTP).to receive(:start).with('www.example.com', 443, nil, hash_including(use_ssl: true))
       described_class.fetch_once(URI('https://www.example.com'), public_ipv4.to_s, :get, {})
     end
 
@@ -295,8 +296,6 @@ describe SsrfFilter do
     end
 
     it 'connects when using SNI' do
-      require 'webrick/https'
-
       port = 8443
       private_key, certificate = make_keypair('CN=localhost')
       virtualhost_private_key, virtualhost_certificate = make_keypair('CN=virtualhost')
@@ -419,6 +418,38 @@ describe SsrfFilter do
           expect(response.body).to match(/ssrf_filter/)
         end
       ensure
+        web_server_thread&.kill
+      end
+    end
+
+    it 'does not connect through proxies' do
+      queue = Queue.new
+      original = ENV.fetch('http_proxy', nil)
+      called = false
+
+      begin
+        web_server_thread = Thread.new do
+          server = WEBrick::HTTPProxyServer.new(
+            BindAddress: '127.0.0.1',
+            Port: 8081,
+            StartCallback: proc do
+              queue.push(nil)
+            end,
+            ProxyAuthProc: proc do
+              called = true
+            end
+          )
+          server.start
+        end
+
+        Timeout.timeout(2) do
+          queue.pop
+          ENV['http_proxy'] = 'http://127.0.0.1:8081'
+          described_class.get('http://www.example.com')
+          expect(called).to be false
+        end
+      ensure
+        ENV['http_proxy'] = original
         web_server_thread&.kill
       end
     end

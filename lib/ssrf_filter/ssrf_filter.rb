@@ -244,7 +244,7 @@ class SsrfFilter
       ipaddr: ip
     )
 
-    ::Net::HTTP.start(uri.hostname, uri.port, **http_options) do |http|
+    ::Net::HTTP.start(uri.hostname, uri.port, nil, **http_options) do |http|
       response = http.request(request) do |res|
         block&.call(res)
       end
