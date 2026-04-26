@@ -59,13 +59,17 @@ class SsrfFilter
   NAT64_LOCAL_PREFIX = ::IPAddr.new('64:ff9b:1::/48').freeze
 
   IPV6_BLACKLIST = ([
+    ::IPAddr.new('::/128'), # Unspecified address
     ::IPAddr.new('::1/128'), # Loopback
     ::IPAddr.new('100::/64'), # Discard prefix (RFC 6666)
     ::IPAddr.new('2001::/32'), # Teredo tunneling
+    ::IPAddr.new('2001:2::/48'), # Benchmarking (RFC 5180)
     ::IPAddr.new('2001:10::/28'), # Deprecated (previously ORCHID)
     ::IPAddr.new('2001:20::/28'), # ORCHIDv2
     ::IPAddr.new('2001:db8::/32'), # Addresses used in documentation and example source code
     ::IPAddr.new('2002::/16'), # 6to4
+    ::IPAddr.new('3fff::/20'), # Documentation (RFC 9637)
+    ::IPAddr.new('5f00::/16'), # Segment Routing (SRv6) SIDs (RFC 9602)
     ::IPAddr.new('fc00::/7'), # Unique local address
     ::IPAddr.new('fe80::/10'), # Link-local address
     ::IPAddr.new('ff00::/8') # Multicast
