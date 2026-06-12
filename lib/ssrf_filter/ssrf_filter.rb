@@ -62,6 +62,7 @@ class SsrfFilter
     ::IPAddr.new('::/128'), # Unspecified address
     ::IPAddr.new('::1/128'), # Loopback
     ::IPAddr.new('100::/64'), # Discard prefix (RFC 6666)
+    ::IPAddr.new('100:0:0:1::/64'), # Dummy IPv6 prefix (RFC 9780)
     ::IPAddr.new('2001::/32'), # Teredo tunneling
     ::IPAddr.new('2001:2::/48'), # Benchmarking (RFC 5180)
     ::IPAddr.new('2001:10::/28'), # Deprecated (previously ORCHID)
@@ -221,6 +222,10 @@ class SsrfFilter
     request['host'] = normalized_hostname(uri)
 
     Array(options[:headers]).each do |header, value|
+      # Newer rubies raise ArgumentError when assigning a header name with control characters, which
+      # would pre-empt the CRLFInjection check in validate_request, so reject it with our own error here
+      raise CRLFInjection, "CRLF injection in header #{header} with value #{value}" if header.to_s.count("\r\n") != 0
+
       request[header] = value
     end
 
