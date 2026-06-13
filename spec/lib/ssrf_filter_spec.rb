@@ -31,6 +31,13 @@ describe SsrfFilter do
       expect(described_class.unsafe_ip_address?(private_ipv6)).to be(true)
     end
 
+    it 'returns true for the dummy ipv6 prefix (RFC 9780)' do
+      expect(described_class.unsafe_ip_address?(IPAddr.new('100:0:0:1::1'))).to be(true)
+      expect(described_class.unsafe_ip_address?(IPAddr.new('100:0:0:1::dead'))).to be(true)
+      # Adjacent unregistered range must stay allowed (fix is scoped to /64)
+      expect(described_class.unsafe_ip_address?(IPAddr.new('100:0:0:2::1'))).to be(false)
+    end
+
     it 'returns true for mapped/compat ipv4 addresses' do
       described_class::IPV4_BLACKLIST.each do |addr|
         %i[ipv4_compat ipv4_mapped].each do |method|
@@ -202,6 +209,14 @@ describe SsrfFilter do
       expect do
         described_class.get("https://#{public_ipv4}", headers: {'name' => "val\rue"})
       end.to raise_error(exception)
+    end
+
+    it 'raises CRLFInjection if the assembled request contains a header with newlines' do
+      # Net::HTTP rejects newline headers on assignment, so one can only reach the assembled
+      # request by bypassing it (e.g. via request_proc); stub #each to exercise that backstop
+      request = Net::HTTP::Get.new('/')
+      allow(request).to receive(:each).and_yield('x-header', "bad\nvalue")
+      expect { described_class.validate_request(request) }.to raise_error(described_class::CRLFInjection)
     end
   end
 
