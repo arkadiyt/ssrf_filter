@@ -99,6 +99,15 @@ class SsrfFilter
   DEFAULT_SENSITIVE_HEADERS = %w[authorization cookie].freeze
   DEFAULT_ON_CROSS_ORIGIN_REDIRECT = :strip
 
+  CONNECTION_ERRORS = [
+    ::Errno::EHOSTUNREACH,
+    ::Errno::ENETUNREACH,
+    ::Errno::EADDRNOTAVAIL,
+    ::Errno::ECONNREFUSED,
+    ::Errno::ETIMEDOUT,
+    ::Net::OpenTimeout
+  ].freeze
+
   VERB_MAP = {
     get: ::Net::HTTP::Get,
     put: ::Net::HTTP::Put,
@@ -161,7 +170,7 @@ class SsrfFilter
           []
         end
 
-        response, url = fetch_once(uri, public_addresses.sample.to_s, method,
+        response, url = fetch_with_fallback(uri, public_addresses, method,
           options.merge(headers_to_strip: headers_to_strip), &block)
         return response if url.nil?
       end
@@ -209,6 +218,18 @@ class SsrfFilter
     else
       "#{uri.hostname}:#{uri.port}"
     end
+  end
+
+  private_class_method def self.fetch_with_fallback(uri, public_addresses, verb, options, &block)
+    last_error = nil
+
+    public_addresses.shuffle.each do |ip_address|
+      return fetch_once(uri.dup, ip_address.to_s, verb, options, &block)
+    rescue *CONNECTION_ERRORS => e
+      last_error = e
+    end
+
+    raise last_error
   end
 
   private_class_method def self.fetch_once(uri, ip, verb, options, &block)
