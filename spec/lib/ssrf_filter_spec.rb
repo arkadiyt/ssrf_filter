@@ -186,6 +186,64 @@ describe SsrfFilter do
     end
   end
 
+  describe 'fetch_with_fallback' do
+    it 'falls back to the next public address when a connection cannot be established' do
+      addresses = [public_ipv6, public_ipv4]
+      allow(addresses).to receive(:shuffle).and_return(addresses)
+      response = instance_double(Net::HTTPOK)
+      attempted = []
+      allow(described_class).to receive(:fetch_once) do |_uri, ip, *_rest|
+        attempted << ip
+        raise Errno::EHOSTUNREACH, 'No route to host' if ip == public_ipv6.to_s
+
+        [response, nil]
+      end
+
+      result, url = described_class.fetch_with_fallback(URI('https://www.example.com'), addresses, :get, {})
+      expect(result).to be(response)
+      expect(url).to be_nil
+      expect(attempted).to eq([public_ipv6.to_s, public_ipv4.to_s])
+    end
+
+    it 'raises the last connection error when every address is unreachable' do
+      addresses = [public_ipv4, public_ipv6]
+      allow(described_class).to receive(:fetch_once).and_raise(Errno::ENETUNREACH)
+      expect do
+        described_class.fetch_with_fallback(URI('https://www.example.com'), addresses, :get, {})
+      end.to raise_error(Errno::ENETUNREACH)
+    end
+
+    it 'does not retry other addresses on a non-connection error' do
+      addresses = [public_ipv4, public_ipv6]
+      call_count = 0
+      allow(described_class).to receive(:fetch_once) do
+        call_count += 1
+        raise Net::ReadTimeout
+      end
+      expect do
+        described_class.fetch_with_fallback(URI('https://www.example.com'), addresses, :get, {})
+      end.to raise_error(Net::ReadTimeout)
+      expect(call_count).to eq(1)
+    end
+
+    it 'does not compound :params across a fallback (dups the uri per attempt)' do
+      # Without the per-attempt dup, the second attempt would re-merge params onto the
+      # already-merged query and request '?a=1&b=2&b=2', which this stub would not match.
+      stub_request(:get, 'https://www.example.com/?a=1&b=2').to_return(status: 200, body: 'ok')
+      addresses = [public_ipv6, public_ipv4]
+      allow(addresses).to receive(:shuffle).and_return(addresses)
+      allow(Net::HTTP).to receive(:start).and_wrap_original do |orig, *args, &blk|
+        raise Errno::EHOSTUNREACH if args.last[:ipaddr] == public_ipv6.to_s
+
+        orig.call(*args, &blk)
+      end
+
+      uri = URI('https://www.example.com/?a=1')
+      response = described_class.fetch_with_fallback(uri, addresses, :get, params: {b: '2'}).first
+      expect(response.code).to eq('200')
+    end
+  end
+
   describe 'validate_request' do
     it 'disallows header names with newlines and carriage returns' do
       expect do
@@ -612,6 +670,19 @@ describe SsrfFilter do
       described_class.get('https://www.example.com/', headers: auth_header)
       expect(a_request(:get, 'https://www.example2.com/').with(headers: auth_header)).not_to have_been_made
       expect(a_request(:get, 'https://www.example2.com/other').with(headers: auth_header)).not_to have_been_made
+    end
+
+    it 'retries other resolved addresses when one is unreachable (resolves issue #92)' do
+      stub_request(:get, 'https://www.example.com').to_return(status: 200, body: 'response body')
+      resolver = proc { [public_ipv6, public_ipv4] }
+      allow(Net::HTTP).to receive(:start).and_wrap_original do |orig, *args, &blk|
+        raise Errno::EHOSTUNREACH, 'No route to host' if args.last[:ipaddr] == public_ipv6.to_s
+
+        orig.call(*args, &blk)
+      end
+
+      response = described_class.get('https://www.example.com', resolver: resolver)
+      expect(response.code).to eq('200')
     end
   end
 end
