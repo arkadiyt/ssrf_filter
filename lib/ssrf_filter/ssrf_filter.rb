@@ -280,9 +280,10 @@ class SsrfFilter
       end
       case response
       when ::Net::HTTPRedirection
-        url = response['location']
-        # Handle relative redirects
-        url = "#{uri.scheme}://#{normalized_hostname(uri)}#{url}" if url&.start_with?('/')
+        location = response['location']
+        # RFC 9110 s10.2.2: Location is a URI-reference, resolved against the request URI
+        # according to RFC 3986 s5.
+        url = location && ::URI.join(uri, location).to_s
       else
         url = nil
       end

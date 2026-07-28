@@ -624,13 +624,68 @@ describe SsrfFilter do
       expect(response.body).to eq('response body')
     end
 
-    it 'follows relative redirects and succeed' do
+    it 'follows root-relative redirects and succeeds' do
       stub_request(:post, 'https://www.example.com/path?key=value').to_return(status: 301,
         headers: {location: '/path2?key2=value2'})
       stub_request(:post, 'https://www.example.com/path2?key2=value2').to_return(status: 200, body: 'response body')
       response = described_class.post('https://www.example.com/path?key=value')
       expect(response.code).to eq('200')
       expect(response.body).to eq('response body')
+    end
+
+    it 'follows path-relative redirects' do
+      stub_request(:get, 'https://www.example.com/start/page').to_return(status: 301,
+        headers: {location: 'final'})
+      stub_request(:get, 'https://www.example.com/start/final').to_return(status: 200, body: 'response body')
+      response = described_class.get('https://www.example.com/start/page')
+      expect(response.code).to eq('200')
+      expect(response.body).to eq('response body')
+    end
+
+    it 'resolves dot segments in redirects' do
+      stub_request(:get, 'https://www.example.com/start/page').to_return(status: 301,
+        headers: {location: '../contact'})
+      stub_request(:get, 'https://www.example.com/contact').to_return(status: 200, body: 'response body')
+      response = described_class.get('https://www.example.com/start/page')
+      expect(response.code).to eq('200')
+      expect(response.body).to eq('response body')
+    end
+
+    it 'follows query-only redirects' do
+      stub_request(:get, 'https://www.example.com/start/page').to_return(status: 301,
+        headers: {location: '?page=2'})
+      stub_request(:get, 'https://www.example.com/start/page?page=2').to_return(status: 200, body: 'response body')
+      response = described_class.get('https://www.example.com/start/page')
+      expect(response.code).to eq('200')
+      expect(response.body).to eq('response body')
+    end
+
+    it 'validates the host in a protocol-relative redirect' do
+      stub_request(:get, 'https://www.example.com/start').to_return(status: 301,
+        headers: {location: '//private.example.com/page'})
+      resolver = proc { |hostname| hostname == 'www.example.com' ? [public_ipv4] : [private_ipv4] }
+      expect do
+        described_class.get('https://www.example.com/start', resolver: resolver)
+      end.to raise_error(described_class::PrivateIPAddress, /private\.example\.com/)
+      expect(a_request(:get, 'https://private.example.com/page')).not_to have_been_made
+    end
+
+    it 'strips sensitive headers on a protocol-relative cross-origin redirect' do
+      stub_request(:get, 'https://www.example.com/').to_return(status: 301,
+        headers: {location: '//www.example2.com/page'})
+      stub_request(:get, 'https://www.example2.com/page').to_return(status: 200)
+      auth_header = {'Authorization' => 'Bearer token'}
+      described_class.get('https://www.example.com/', headers: auth_header)
+      expect(a_request(:get, 'https://www.example2.com/page').with(headers: auth_header)).not_to have_been_made
+      expect(a_request(:get, 'https://www.example2.com/page')).to have_been_made
+    end
+
+    it 'raises URI::InvalidURIError for a malformed redirect location' do
+      stub_request(:get, 'https://www.example.com/').to_return(status: 301,
+        headers: {location: 'http://[invalid'})
+      expect do
+        described_class.get('https://www.example.com/')
+      end.to raise_error(URI::InvalidURIError)
     end
 
     it 'strips sensitive headers set via request_proc on cross-origin redirect' do
