@@ -1,3 +1,10 @@
+### 1.6.0 (9/8/2026)
+* Ignore proxies ([arkadiyt](https://github.com/arkadiyt/ssrf_filter/pull/89))
+* Filter out some IPv6 ranges ([arkadiyt](https://github.com/arkadiyt/ssrf_filter/pull/90))
+* Filter out some dummy rnages ([arkadiyt](https://github.com/arkadiyt/ssrf_filter/pull/91))
+* Retry connection failures with differnet ips ([arkadiyt](https://github.com/arkadiyt/ssrf_filter/pull/93))
+
+
 ### 1.5.0 (4/2/2026)
 * Fix an issue where sensitive headers could have been sent to unintended origins during redirects ([xkiluar](https://hackerone.com/xkiluar), [arkadiyt](https://github.com/arkadiyt/ssrf_filter/pull/86))
 
