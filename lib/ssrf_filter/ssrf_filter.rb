@@ -79,7 +79,7 @@ class SsrfFilter
 
     # Don't call ipaddr.ipv4_compat because it prints out a deprecation warning on ruby 2.5+
     ipv4_compatible  = IPAddr.new(ipaddr.to_i, Socket::AF_INET6).mask(96 + prefixlen)
-    ipv4_mapped      = ipaddr.ipv4_mapped.mask(80 + prefixlen)
+    ipv4_mapped      = ipaddr.ipv4_mapped.mask(96 + prefixlen)
     # IPv4-translated (RFC 2765): ::ffff:0:x.x.x.x/96+n
     ipv4_translated  = IPAddr.new("::ffff:0:#{ipaddr}").mask(96 + prefixlen)
     # NAT64 well-known prefix (RFC 6052): 64:ff9b::x.x.x.x/96+n
