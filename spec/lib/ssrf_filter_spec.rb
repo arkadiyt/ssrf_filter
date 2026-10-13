@@ -50,6 +50,16 @@ describe SsrfFilter do
       end
     end
 
+    it 'returns false for mapped public ipv4 addresses' do
+      # ::ffff:<ipv4> ranges are masked at 96+prefixlen; masking at
+      # 80+prefixlen yields ::ff00::/88-style ranges that contain every
+      # ::ffff:* address, public or private.
+      expect(described_class.unsafe_ip_address?(IPAddr.new('::ffff:8.8.8.8'))).to be(false)
+      expect(described_class.unsafe_ip_address?(IPAddr.new('::ffff:1.1.1.1'))).to be(false)
+      expect(described_class.unsafe_ip_address?(IPAddr.new('::ffff:127.0.0.1'))).to be(true)
+      expect(described_class.unsafe_ip_address?(IPAddr.new('::ffff:169.254.169.254'))).to be(true)
+    end
+
     it 'returns true for RFC 6052 /48 encoded private IPv4 addresses (nat64 local prefix)' do
       # 10.0.0.1 -> upper=0x0a00, lower=0x0001 -> 64:ff9b:1:a00:0:100::
       expect(described_class.unsafe_ip_address?(IPAddr.new('64:ff9b:1:a00:0:100::'))).to be(true)
