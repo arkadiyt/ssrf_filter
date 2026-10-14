@@ -214,9 +214,9 @@ class SsrfFilter
     # Attach port for non-default as per RFC2616
     if (uri.port == 80 && uri.scheme == 'http') ||
        (uri.port == 443 && uri.scheme == 'https')
-      uri.hostname
+      uri.host
     else
-      "#{uri.hostname}:#{uri.port}"
+      "#{uri.host}:#{uri.port}"
     end
   end
 
@@ -239,7 +239,8 @@ class SsrfFilter
       uri.query = ::URI.encode_www_form(params)
     end
 
-    request = VERB_MAP[verb].new(uri)
+    # Older net/http versions misparse bracketed IPv6 Host headers when updating a request's URI.
+    request = VERB_MAP[verb].new(uri.request_uri)
     request['host'] = normalized_hostname(uri)
 
     Array(options[:headers]).each do |header, value|
