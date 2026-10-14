@@ -123,6 +123,20 @@ describe SsrfFilter do
   end
 
   describe 'fetch_once' do
+    {
+      'http://[2606:4700:4700::1111]/' => '[2606:4700:4700::1111]',
+      'https://[2606:4700:4700::1111]/' => '[2606:4700:4700::1111]',
+      'https://[2606:4700:4700::1111]:8080/' => '[2606:4700:4700::1111]:8080',
+      'http://[::ffff:8.8.8.8]:8080/' => '[::ffff:8.8.8.8]:8080'
+    }.each do |url, host|
+      it "preserves IPv6 brackets in the Host header for #{url}" do
+        stub_request(:get, url).with(headers: {host: host}).to_return(status: 200)
+        response, redirect = described_class.fetch_once(URI(url), public_ipv6.to_s, :get, {})
+        expect(response.code).to eq('200')
+        expect(redirect).to be_nil
+      end
+    end
+
     it 'sets the host header' do
       stub_request(:post, 'https://www.example.com').with(headers: {host: 'www.example.com'})
         .to_return(status: 200, body: 'response body')
@@ -297,6 +311,42 @@ describe SsrfFilter do
     # 3) stubbing out the IPV4_BLACKLIST to allow connections to localhost
 
     allow_net_connections_for_context(self)
+
+    it 'preserves IPv6 Host headers and follows root-relative redirects over a real connection' do
+      stub_const('SsrfFilter::IPV6_BLACKLIST', [])
+      requests = []
+      server = TCPServer.new('::1', 0)
+      port = server.addr[1]
+      web_server_thread = Thread.new do
+        2.times do |hop|
+          socket = server.accept
+          lines = []
+          while (line = socket.gets) && line != "\r\n"
+            lines << line.chomp
+          end
+          requests << lines
+          response = hop.zero? ? "302 Found\r\nLocation: /finish?redirect=yes" : '200 OK'
+          socket.write("HTTP/1.1 #{response}\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok")
+        ensure
+          socket&.close
+        end
+      end
+
+      Timeout.timeout(5) do
+        response = described_class.get("http://[::1]:#{port}/start?initial=yes", params: {extra: 'value'})
+        expect(response.code).to eq('200')
+        expect(response.body).to eq('ok')
+        expect(requests.map(&:first)).to eq([
+          'GET /start?initial=yes&extra=value HTTP/1.1',
+          'GET /finish?redirect=yes&extra=value HTTP/1.1'
+        ])
+        expect(requests).to all(include("Host: [::1]:#{port}"))
+      end
+    ensure
+      web_server_thread&.kill
+      web_server_thread&.join
+      server&.close
+    end
 
     def make_keypair(subject)
       private_key = OpenSSL::PKey::RSA.new(2048)
@@ -539,6 +589,15 @@ describe SsrfFilter do
   end
 
   describe 'get/put/post/delete' do
+    it 'rejects a private IPv6 destination after a public IPv6 redirect' do
+      url = "http://[#{public_ipv6}]/"
+      stub_request(:get, url).to_return(status: 302, headers: {location: 'http://[::1]/'})
+      expect do
+        described_class.get(url)
+      end.to raise_error(described_class::PrivateIPAddress)
+      expect(a_request(:get, 'http://[::1]/')).not_to have_been_made
+    end
+
     it 'fails if the scheme is not in the default whitelist' do
       expect do
         described_class.get('ftp://example.com')
