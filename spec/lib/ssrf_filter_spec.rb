@@ -38,6 +38,40 @@ describe SsrfFilter do
       expect(described_class.unsafe_ip_address?(IPAddr.new('100:0:0:2::1'))).to be(false)
     end
 
+    it 'blocks unallocated IETF protocol addresses and addresses next to public allocations' do
+      %w[
+        2001:1:1::1 2001:1:: 2001:1::4
+        2001:2:ffff:ffff:ffff:ffff:ffff:ffff 2001:4::
+        2001:4:111:ffff:ffff:ffff:ffff:ffff 2001:4:113::
+        2001:40:: 2001:1ff:ffff:ffff:ffff:ffff:ffff:ffff
+      ].each do |address|
+        expect(described_class.unsafe_ip_address?(IPAddr.new(address))).to be(true), address
+      end
+    end
+
+    it 'preserves public IETF allocations including their boundaries' do
+      %w[
+        2001:1::1 2001:1::2 2001:1::3
+        2001:3:: 2001:3:ffff:ffff:ffff:ffff:ffff:ffff
+        2001:4:112:: 2001:4:112:ffff:ffff:ffff:ffff:ffff
+        2001:30:: 2001:3f:ffff:ffff:ffff:ffff:ffff:ffff
+      ].each do |address|
+        expect(described_class.unsafe_ip_address?(IPAddr.new(address))).to be(false), address
+      end
+    end
+
+    it 'keeps previously blocked IETF protocol allocations unsafe' do
+      %w[2001:: 2001::1 2001:2::1 2001:10::1 2001:20::1 2001:2f:ffff:ffff:ffff:ffff:ffff:ffff].each do |address|
+        expect(described_class.unsafe_ip_address?(IPAddr.new(address))).to be(true), address
+      end
+    end
+
+    it 'does not extend blocking beyond the IETF protocol prefix' do
+      %w[2000:ffff:ffff:ffff:ffff:ffff:ffff:ffff 2001:200::].each do |address|
+        expect(described_class.unsafe_ip_address?(IPAddr.new(address))).to be(false), address
+      end
+    end
+
     it 'returns true for mapped/compat ipv4 addresses' do
       described_class::IPV4_BLACKLIST.each do |addr|
         %i[ipv4_compat ipv4_mapped].each do |method|
@@ -589,6 +623,31 @@ describe SsrfFilter do
   end
 
   describe 'get/put/post/delete' do
+    it 'rejects an unallocated IETF protocol address before connecting' do
+      expect(Net::HTTP).not_to receive(:start)
+      expect do
+        described_class.get('http://[2001:1:1::1]:18081/')
+      end.to raise_error(described_class::PrivateIPAddress)
+    end
+
+    it 'rejects a hostname resolving to an unallocated IETF protocol address' do
+      allow(Resolv).to receive(:getaddresses).with('internal.example').and_return(['2001:1:1::1'])
+      expect(Net::HTTP).not_to receive(:start)
+      expect do
+        described_class.get('http://internal.example/')
+      end.to raise_error(described_class::PrivateIPAddress)
+    end
+
+    it 'rejects a redirect to an unallocated IETF protocol address' do
+      url = "http://[#{public_ipv6}]/"
+      destination = 'http://[2001:1:1::1]/'
+      stub_request(:get, url).to_return(status: 302, headers: {location: destination})
+      expect do
+        described_class.get(url)
+      end.to raise_error(described_class::PrivateIPAddress)
+      expect(a_request(:get, destination)).not_to have_been_made
+    end
+
     it 'rejects a private IPv6 destination after a public IPv6 redirect' do
       url = "http://[#{public_ipv6}]/"
       stub_request(:get, url).to_return(status: 302, headers: {location: 'http://[::1]/'})

@@ -58,6 +58,19 @@ class SsrfFilter
   # NAT64 local-use prefix (RFC 8215), uses RFC 6052 /48 encoding (checked at runtime).
   NAT64_LOCAL_PREFIX = ::IPAddr.new('64:ff9b:1::/48').freeze
 
+  IPV6_IETF_PROTOCOL_PREFIX = ::IPAddr.new('2001::/23').freeze
+
+  # Public allocations within 2001::/23; existing ORCHIDv2 blocking remains in effect.
+  # https://www.iana.org/assignments/iana-ipv6-special-registry/
+  IPV6_IETF_PUBLIC_ALLOCATIONS = [
+    ::IPAddr.new('2001:1::1/128'), # PCP anycast
+    ::IPAddr.new('2001:1::2/128'), # TURN anycast
+    ::IPAddr.new('2001:1::3/128'), # DNS-SD SRP anycast
+    ::IPAddr.new('2001:3::/32'), # AMT
+    ::IPAddr.new('2001:4:112::/48'), # AS112
+    ::IPAddr.new('2001:30::/28') # Drone Remote ID
+  ].freeze
+
   IPV6_BLACKLIST = ([
     ::IPAddr.new('::/128'), # Unspecified address
     ::IPAddr.new('::1/128'), # Loopback
@@ -188,6 +201,10 @@ class SsrfFilter
 
     if ip_address.ipv6?
       return true if IPV6_BLACKLIST.any? { |range| range.include?(ip_address) }
+
+      if IPV6_IETF_PROTOCOL_PREFIX.dup.include?(ip_address)
+        return IPV6_IETF_PUBLIC_ALLOCATIONS.none? { |range| range.include?(ip_address) }
+      end
 
       # RFC 6052 /48 encoding for NAT64 local-use prefix (RFC 8215): 64:ff9b:1::/48
       # IPv4 is split around u-bits at positions 64-71, so must be decoded at runtime
