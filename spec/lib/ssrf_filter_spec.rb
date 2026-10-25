@@ -702,6 +702,23 @@ describe SsrfFilter do
       expect(response.body).to eq('response body')
     end
 
+    it 'follows relative redirects without a leading slash' do
+      stub_request(:get, 'https://www.example.com/redirect-to?url=html').to_return(status: 302,
+        headers: {location: 'html'})
+      stub_request(:get, 'https://www.example.com/html').to_return(status: 200, body: 'response body')
+      response = described_class.get('https://www.example.com/redirect-to?url=html')
+      expect(response.code).to eq('200')
+      expect(response.body).to eq('response body')
+    end
+
+    it 'follows protocol-relative redirects to the new host' do
+      stub_request(:get, 'https://example.com/').to_return(status: 301, headers: {location: '//www.example.com/'})
+      stub_request(:get, 'https://www.example.com/').to_return(status: 200, body: 'response body')
+      response = described_class.get('https://example.com/')
+      expect(response.code).to eq('200')
+      expect(response.body).to eq('response body')
+    end
+
     it 'strips sensitive headers set via request_proc on cross-origin redirect' do
       stub_request(:get, 'https://www.example.com/').to_return(status: 301, headers: {location: 'https://www.example2.com/'})
       stub_request(:get, 'https://www.example2.com/').to_return(status: 200)
