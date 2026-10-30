@@ -10,7 +10,8 @@ jobs:
     strategy:
       matrix:
         ruby-version: [2.7.0, 3.0.0, 3.1.0, 3.2.0, 3.3.0, 3.4.0, 3.5.0, 4.0.0, head]
-    runs-on: ubuntu-latest
+    # ubuntu-26.04, which ubuntu-latest now points to, only has the latest patch release of Ruby 3.2 and newer
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v3
     - uses: ruby/setup-ruby@v1
