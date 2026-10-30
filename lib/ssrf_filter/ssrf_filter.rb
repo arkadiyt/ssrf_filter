@@ -283,7 +283,7 @@ class SsrfFilter
       when ::Net::HTTPRedirection
         url = response['location']
         # Handle relative redirects
-        url = "#{uri.scheme}://#{normalized_hostname(uri)}#{url}" if url&.start_with?('/')
+        url = ::URI.join(uri, url).to_s if url
       else
         url = nil
       end
